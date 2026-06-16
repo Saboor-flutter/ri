@@ -1,0 +1,200 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'skin_type.dart';
+import '../utills/assets.dart';
+import '../utills/color_constant.dart';
+import '../utills/custom_fonts.dart';
+import '../view_models/sign_up_onboarding_view_model.dart';
+
+class SignupOnboarding extends ConsumerStatefulWidget {
+  const SignupOnboarding({super.key});
+  static const String routeName = '/SignupOnboarding';
+
+  @override
+  ConsumerState<SignupOnboarding> createState() => _SignupOnboardingState();
+}
+
+class _SignupOnboardingState extends ConsumerState<SignupOnboarding> {
+  late final PageController _pageController;
+
+  List<Widget> _pages = [
+    // SkinType(),
+    // MainSkinConcernsScreen(),
+    // LifeStyleHabbits(),
+    // SkinAllergiesScreen(),
+    // SkinGoalsScreen(),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final signupViewModel = ref.read(onBoardingViewModel.notifier);
+      await signupViewModel.callOnBoardingQuestionApi();
+      if (mounted) {
+        signupViewModel.setPageController(_pageController);
+        final questions =
+            ref.read(onBoardingViewModel).onBoardingQues?.data?.questions ?? [];
+
+        _pages = List.generate(questions.length, (index) => const SkinType());
+
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(onBoardingViewModel);
+    final notifier = ref.read(onBoardingViewModel.notifier);
+    return Scaffold(
+      body: Container(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.paddingOf(context).bottom,
+          top: MediaQuery.paddingOf(context).top,
+        ),
+        decoration: BoxDecoration(
+          gradient: CustomColors.blueWhitePurpleGradient,
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              top: -40,
+              left: 0,
+              right: 0,
+              child: Opacity(
+                opacity: 0.5,
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 201.h,
+                  child: Image.asset(PngAssets.signupVector),
+                ),
+              ),
+            ),
+            Column(
+              children: [
+                SizedBox(height: 28.h),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 30.w),
+                  child: Column(
+                    children: [
+                      // Progress Bar
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            '${state.currentPage + 1}/${state.totalPages}',
+                            style: CustomFonts.black20w600,
+                          ),
+                          SizedBox(width: 12.w),
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10.r),
+                              child: LinearProgressIndicator(
+                                value: notifier.progressValue(),
+                                minHeight: 10.h,
+                                backgroundColor: Colors.white,
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  CustomColors.lightBlueColor,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 16.h),
+
+                      // Navigation Buttons Row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          state.currentPage > 0
+                              ? GestureDetector(
+                                  onTap: () {
+                                    notifier.goToPreviousPage();
+                                  },
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 8.w,
+                                      vertical: 10.h,
+                                    ),
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: CustomColors.purpleColor,
+                                    ),
+                                    child: Icon(
+                                      CupertinoIcons.arrow_left,
+                                      size: 18.sp,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                )
+                              : const SizedBox(),
+                          GestureDetector(
+                            onTap: () {
+                              notifier.onSkipThis(context);
+                            },
+                            child: Row(
+                              children: [
+                                Text(
+                                  'Skip This',
+                                  style: CustomFonts.black16w400,
+                                ),
+                                SizedBox(width: 8.w),
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 8.w,
+                                    vertical: 10.h,
+                                  ),
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: CustomColors.purpleColor,
+                                  ),
+                                  child: Icon(
+                                    CupertinoIcons.arrow_right,
+                                    size: 18.sp,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: _pages.isEmpty
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            color: CustomColors.purpleColor,
+                          ),
+                        )
+                      : PageView.builder(
+                          controller: _pageController,
+                          onPageChanged: (index) =>
+                              notifier.onPageChanged(index),
+                          itemCount: _pages.length,
+                          itemBuilder: (context, index) {
+                            return _pages[index];
+                          },
+                        ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

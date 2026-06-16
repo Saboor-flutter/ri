@@ -1,0 +1,388 @@
+import 'dart:developer';
+import 'dart:io';
+
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_easyloading/flutter_easyloading.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import '../models/requests/onboarding_profile_request.dart';
+import '../models/requests/otp_request.dart';
+import '../models/responses/address_data.dart';
+import '../models/responses/base_response_model.dart';
+import '../services/apple_auth_service.dart';
+import '../services/google_auth_service.dart';
+import '../services/location_service.dart';
+import '../services/media_service.dart';
+import '../utills/biometric_helper.dart';
+
+import '../models/base_state_model.dart';
+import '../models/requests/sign_in_request.dart';
+import '../models/responses/auth_response.dart';
+import '../repositories/auth_repository.dart';
+import '../services/api_base_helper.dart';
+import '../services/auth_service.dart';
+import '../utills/enums.dart';
+import '../utills/secure_storage_service.dart';
+import 'base_view_model.dart';
+
+final authViewModel = NotifierProvider(() {
+  final apiBaseHelper = ApiBaseHelper();
+  final authService = AuthService(apiClient: apiBaseHelper);
+  return AuthViewModel(authRepository: authService);
+});
+
+class AuthViewModel extends BaseViewModel<AuthState> {
+  AuthViewModel({required AuthRepository authRepository})
+    : _authRepository = authRepository,
+      super(initialState: const AuthState());
+
+  final AuthRepository _authRepository;
+  final ImagePicker _imagePicker = ImagePicker();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController otpController = TextEditingController();
+
+  TextEditingController get phoneController => _phoneController;
+
+  TextEditingController get passwordController => _passwordController;
+
+  @override
+  void init() {
+    super.init();
+    checkBiometricAvailability();
+  }
+
+  Future<void> checkBiometricAvailability() async {
+    final result = await SecureStorage().getSecureString(
+      key: SharedPreferencesKeys.biometricAuthKey.keyText,
+    );
+    final isAvailable = result != null;
+    IconData? icon;
+    if (isAvailable) {
+      icon = await BiometricHelper().getBiometricIcon();
+    }
+    state = state.copyWith(
+      isBiometricAvailable: isAvailable,
+      biometricIcon: icon,
+    );
+  }
+
+  void setAuthResponse(AuthResponse response) {
+    state = state.copyWith(authResponse: response);
+  }
+
+  Future<void> pickProfileImage(ImageSource source) async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 512,
+        maxHeight: 512,
+      );
+      if (image != null) {
+        state = state.copyWith(profileImage: image);
+      }
+    } catch (e) {
+      onError('Error picking image: $e');
+    }
+  }
+
+  void clearProfileImage() {
+    state = state.copyWith(clearProfileImage: true);
+  }
+
+  // Validate OTP
+  bool validateOtp() {
+    String otp = otpController.text.trim();
+    String? errorMessage;
+
+    if (otp.isEmpty) {
+      errorMessage = "Please enter the OTP";
+    } else if (otp.length != 6) {
+      errorMessage = "OTP must be 6 digits long";
+    }
+
+    if (errorMessage != null) {
+      state = state.copyWith(otpError: errorMessage);
+      return false;
+    }
+
+    state = state.copyWith(clearOtpError: true);
+    return true;
+  }
+
+  Future<bool?> callSignInApi(BaseSignInRequest request) async {
+    return await runSafely(() async {
+      state = state.copyWith(loading: true);
+      final BaseResponseModel response = await _authRepository.signInApi(
+        signInRequest: request,
+      );
+      state = state.copyWith(loading: false);
+      return response.status == true;
+    });
+  }
+
+  Future<bool?> callBiometricRegisterApi() async {
+    return await runSafely(() async {
+      EasyLoading.show(status: "Please wait");
+      final BaseResponseModel response = await _authRepository
+          .biometricRegisterApi();
+      EasyLoading.showSuccess(response.message.toString());
+      if (response.status == true) {
+        await checkBiometricAvailability();
+      }
+      return response.status == true;
+    });
+  }
+
+  Future<bool?> callBiometricUnregisterApi({required bool showLoader}) async {
+    return await runSafely(() async {
+      state = state.copyWith(loading: true);
+      if (showLoader) {
+        EasyLoading.show(status: 'Please wait...');
+      }
+
+      final BaseResponseModel response = await _authRepository
+          .biometricUnregister();
+      state = state.copyWith(loading: false);
+      if (response.status == true) {
+        state = state.copyWith(
+          isBiometricAvailable: false,
+          biometricIcon: null,
+        );
+      }
+      EasyLoading.dismiss();
+      return response.status == true;
+    });
+  }
+
+  Future<bool?> callBiometricLoginApi() async {
+    return await runSafely<bool>(() async {
+      state = state.copyWith(loading: true);
+      final AuthResponse response = await _authRepository.biometricLoginApi();
+      if (response.status == true) {
+        state = state.copyWith(authResponse: response);
+        //  _fetchLocationInBackground();
+        state = state.copyWith(loading: false);
+        return true;
+      }
+      state = state.copyWith(loading: false);
+      return false;
+    });
+  }
+
+  Future<bool?> callVerifyOtpApi() async {
+    final request = OtpRequest(
+      email: emailController.text,
+      otp: otpController.text,
+    );
+    return await runSafely(() async {
+      state = state.copyWith(loading: true);
+      final AuthResponse response = await _authRepository.verifyOTP(
+        otpRequest: request,
+      );
+
+      if (response.status == true) {
+        otpController.clear();
+        await callBiometricUnregisterApi(showLoader: false);
+        _fetchLocationInBackground();
+      }
+      state = state.copyWith(loading: false, authResponse: response);
+      return state.authResponse?.status == true;
+    });
+  }
+
+  Future<bool?> callOnboardingProfileApi({
+    required String name,
+    required String phoneNumber,
+    required String emailAddress,
+    required String location,
+    required String bio,
+    String? cc,
+    String? country,
+  }) async {
+    return await runSafely(() async {
+      state = state.copyWith(loading: true);
+
+      String? imageUrl;
+      if (state.profileImage != null) {
+        imageUrl = await MediaService().uploadImage(
+          state.authResponse?.data?.user?.primaryEmail ?? '',
+          state.profileImage!,
+        );
+      }
+
+      final request = OnBoardingProfileRequest(
+        name: name,
+        phoneNumber: phoneNumber,
+        emailAddress: emailAddress,
+        location: location,
+        bio: bio,
+        cc: cc,
+        country: country,
+        profileImageUrl:
+            imageUrl ?? state.authResponse?.data?.user?.profileImageUrl ?? '',
+      );
+
+      final BaseResponseModel response = await _authRepository
+          .onboardingProfile(onBoardingProfileRequest: request);
+
+      state = state.copyWith(loading: false);
+      if (response.status == true) {
+        await callGetMe();
+        clearProfileImage();
+      }
+      return response.status == true;
+    });
+  }
+
+  Future<bool?> callGetMe() async {
+    return await runSafely(() async {
+      final AuthResponse response = await _authRepository.getMe();
+      if (response.status == true) {
+        state = state.copyWith(authResponse: response);
+        log('get me call successful,');
+        // Location is fetched in background to avoid blocking the UI thread during splash/init
+        _fetchLocationInBackground();
+      }
+      return response.status == true;
+    });
+  }
+
+  void _fetchLocationInBackground() {
+    Future.delayed(const Duration(seconds: 2), () async {
+      try {
+        final addressData = await LocationService().fetchAddress();
+        state = state.copyWith(addressData: addressData);
+      } catch (e) {
+        log('Background location fetch skipped or failed: $e');
+      }
+    });
+  }
+
+  Future<bool?> callGoogleSignInApi() async {
+    String type = Platform.isIOS ? 'ios' : 'android';
+    return await runSafely<bool>(() async {
+      state = state.copyWith(loading: true);
+      final user = await GoogleAuthService().signIn();
+      final idToken = await user.getIdToken();
+      String? fcmToken = await FirebaseMessaging.instance.getToken();
+
+      log("google sign IDToken ${idToken.toString}");
+      final AuthResponse response = await _authRepository.googleSignInApi(
+        request: SocialLoginRequest(
+          deviceType: type,
+          idToken: idToken.toString(),
+          fcmToken: fcmToken ?? '',
+        ),
+      );
+      if (response.status ?? false) {
+        await callBiometricUnregisterApi(showLoader: false);
+        await callGetMe();
+      }
+      state = state.copyWith(loading: false);
+      return response.status ?? false;
+    });
+  }
+
+  Future<bool?> callAppleSignInApi() async {
+    String type = Platform.isIOS ? 'ios' : 'android';
+    return await runSafely<bool>(() async {
+      state = state.copyWith(loading: true);
+      final user = await AppleAuthService().signIn();
+      final idToken = await user.getIdToken();
+      String? fcmToken = await FirebaseMessaging.instance.getToken();
+      final response = await _authRepository.appleSignInApi(
+        request: SocialLoginRequest(
+          deviceType: type,
+          idToken: idToken.toString(),
+          fcmToken: fcmToken ?? '',
+        ),
+      );
+      if (response.status ?? false) {
+        await callBiometricUnregisterApi(showLoader: false);
+        await callGetMe();
+      }
+      state = state.copyWith(loading: false);
+      return response.status ?? false;
+    });
+  }
+
+  void clearData() {
+    emailController.clear();
+    otpController.clear();
+    clearProfileImage();
+  }
+
+  @override
+  void onError(String message) {
+    super.onError(message);
+    state = state.copyWith(loading: false, errorMessage: message);
+    EasyLoading.showError(message);
+    EasyLoading.dismiss();
+  }
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    otpController.dispose();
+    _passwordController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+}
+
+@immutable
+class AuthState extends BaseStateModel {
+  final AuthResponse? authResponse;
+  final String? otpError;
+  final XFile? profileImage;
+  final AddressData? addressData;
+  final bool isBiometricAvailable;
+  final IconData? biometricIcon;
+
+  const AuthState({
+    super.loading = false,
+    super.errorMessage,
+    this.authResponse,
+    this.otpError,
+    this.profileImage,
+    this.addressData,
+    this.isBiometricAvailable = false,
+    this.biometricIcon,
+  });
+
+  @override
+  AuthState copyWith({
+    bool? loading,
+    String? errorMessage,
+    bool? loginWithEmail,
+    bool? loginWithPhone,
+    String? build,
+    String? device,
+    String? version,
+    AuthResponse? authResponse,
+    String? otpError,
+    bool clearOtpError = false,
+    XFile? profileImage,
+    bool clearProfileImage = false,
+    AddressData? addressData,
+    bool? isBiometricAvailable,
+    IconData? biometricIcon,
+  }) {
+    return AuthState(
+      loading: loading ?? this.loading,
+      errorMessage: errorMessage ?? this.errorMessage,
+      authResponse: authResponse ?? this.authResponse,
+      otpError: clearOtpError ? null : (otpError ?? this.otpError),
+      profileImage: clearProfileImage
+          ? null
+          : (profileImage ?? this.profileImage),
+      addressData: addressData ?? this.addressData,
+      isBiometricAvailable: isBiometricAvailable ?? this.isBiometricAvailable,
+      biometricIcon: biometricIcon ?? this.biometricIcon,
+    );
+  }
+}
