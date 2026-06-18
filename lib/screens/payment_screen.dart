@@ -1,244 +1,77 @@
+import 'package:data_table_2/data_table_2.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_easyloading/flutter_easyloading.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
-import '../models/responses/get_clinic_response.dart';
-import '../models/responses/payment_options_response.dart';
-import 'notes_screen.dart';
-import '../utills/assets.dart';
-import '../utills/color_constant.dart';
-import '../utills/custom_fonts.dart';
-import '../view_models/clinlic_doctor_view_model.dart';
-import '../widgets/custom_app_bar.dart';
+import 'package:skinsync_admin/utils/theme.dart';
+import 'package:skinsync_admin/widgets/borderd_container_widget.dart';
+import 'package:skinsync_admin/widgets/gradient_scaffold.dart';
 
-import '../models/responses/availability_response.dart';
-import '../models/responses/get_doctor_response.dart';
+import '../widgets/dailogbox/payment_dailog_box.dart';
 
-class PaymentScreen extends ConsumerStatefulWidget {
-  final Clinic clinic;
-  final Doctor doctor;
-  final Slot slot;
-
-  static const routeName = "/payment_screen";
-  const PaymentScreen({
-    super.key,
-    required this.clinic,
-    required this.doctor,
-    required this.slot,
-  });
-
-  @override
-  ConsumerState<PaymentScreen> createState() => _PaymentScreenState();
-}
-
-class _PaymentScreenState extends ConsumerState<PaymentScreen> {
-  PaymentOption? selectedMode;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref
-          .read(clinicDoctorProvider.notifier)
-          .getPaymentOptions(
-            clinicId: widget.clinic.clinicId!,
-            doctorId: widget.doctor.id!,
-          );
-    });
-  }
+class PaymentScreen extends StatelessWidget {
+  const PaymentScreen({super.key});
+  static const String routeName = '/payment-screen';
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: const CustomAppBar(showTitle: false),
-      body: Padding(
-        padding: EdgeInsetsGeometry.symmetric(horizontal: 30.w),
-        child: _buildBody(),
-      ),
-      bottomNavigationBar: Padding(
-        padding: EdgeInsets.only(
-          top: 20.h,
-          bottom: MediaQuery.paddingOf(context).bottom + 20.h,
-          left: 20.w,
-          right: 20.w,
-        ),
-        child: SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () {
-              if (selectedMode == null) {
-                EasyLoading.showError('Select a payment option!');
-              }
-              Navigator.pushNamed(
-                context,
-                NotesScreen.routeName,
-                arguments: {
-                  'clinic': widget.clinic,
-                  'doctor': widget.doctor,
-                  'slot': widget.slot,
-                  'paymentOption': selectedMode!,
-                },
-              );
-            },
-            child: const Text("Pay Now"),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBody() {
-    return Consumer(
-      builder: (_, ref, _) {
-        final state = ref.watch(
-          clinicDoctorProvider.select((s) => (s.paymentOptions, s.loading)),
-        );
-        if (state.$2) {
-          return const Center(
-            child: CircularProgressIndicator(color: CustomColors.pinkColor),
-          );
-        }
-        return SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: .start,
-            children: [
-              SizedBox(height: 10.h),
-              Text(
-                "Your Treatment Appointment is Ready!",
-                style: CustomFonts.black30w600,
-              ),
-              SizedBox(height: 18.h),
-              Container(
-                padding: EdgeInsets.all(6.w),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(15.r),
-                  border: Border.all(color: CustomColors.blackColor),
-                ),
-                child: Row(
-                  children: [
-                    Image.asset(
-                      DummyAssets.treatmentimage,
-                      fit: BoxFit.fill,
-                      height: 105.h,
-                      width: 151.w,
-                    ),
-                    SizedBox(width: 21.w),
-                    Column(
-                      crossAxisAlignment: .start,
-                      children: [
-                        Text(
-                          widget.slot.appointmentDateTime,
-                          style: CustomFonts.black14w500,
-                        ),
-                        Text(
-                          "Derma Fillers - Cheeks",
-                          style: CustomFonts.black14w600,
-                        ),
-                        Text(
-                          widget.clinic.clinicName ?? "Glow Skin Clinic",
-                          style: CustomFonts.black14w400,
-                        ),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.attach_file,
-                              size: 12.sp,
-                              color: CustomColors.blackColor,
-                            ),
-                            Text(
-                              " Derma Fillers Cheeks Model",
-                              style: CustomFonts.black14w400Underline,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: 22.h),
-              Divider(height: 0, color: Colors.grey.shade300),
-              SizedBox(height: 22.h),
-              Text("Select Your Payment Mode", style: CustomFonts.black22w600),
-              SizedBox(height: 20.h),
-              for (final paymentOption in state.$1)
-                paymentTile(
-                  price: paymentOption.amount ?? 0,
-                  paymentOption: paymentOption,
-                  title: paymentOption.title ?? 'N/A',
-                  description: paymentOption.description ?? 'N/A',
-                ),
-              SizedBox(height: 22.h),
-              Divider(height: 0, color: Colors.grey.shade300),
-              SizedBox(height: 14.h),
-              Row(
-                mainAxisAlignment: .spaceBetween,
-                children: [
-                  Text("Total Amount", style: CustomFonts.black16w600),
-                  Text("\$ 550", style: CustomFonts.black16w600),
-                ],
-              ),
-              SizedBox(height: 24.h),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget paymentTile({
-    required String title,
-    required String description,
-    required int price,
-    required PaymentOption paymentOption,
-  }) {
-    final isSelected = selectedMode == paymentOption;
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          selectedMode = paymentOption;
-        });
-      },
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 10.h),
-        margin: EdgeInsets.only(bottom: 15.h),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(15.r),
-          border: Border.all(
-            color: isSelected
-                ? CustomColors.lightBlueColor
-                : Colors.grey.shade300,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return GradientScaffold(
+      body: SingleChildScrollView(
+        padding: context.appEdgeInsets(horizontal: 24, vertical: 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: CustomFonts.black14w700),
-                  SizedBox(height: 2.h),
-                  Text(description, style: CustomFonts.black12w400),
-                ],
-              ),
-            ),
+            _buildHeader(context),
+            context.verticalSpace(32),
+            _buildPaymentMetrics(context),
+            context.verticalSpace(32),
+            _buildRecentTransactionsTable(context),
+            context.verticalSpace(32),
+            _buildPayoutRequestsTable(context),
+          ],
+        ),
+      ),
+    );
+  }
 
-            /// Radio icon
+  Widget _buildHeader(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Financial Console', style: context.fonts.black26w700),
+        context.verticalSpace(8),
+        Text(
+          'Monitor network-wide transactions, commissions, and clinic payouts.',
+          style: context.fonts.grey14w400,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPaymentMetrics(BuildContext context) {
+    return Row(
+      children: [
+        _buildMetricCard(context, 'Total Network GMV', '\$124,500', Icons.account_balance_wallet_outlined, CustomColors.purple),
+        context.horizontalSpace(16),
+        _buildMetricCard(context, 'Net Platform Revenue', '\$18,675', Icons.trending_up_rounded, CustomColors.green),
+        context.horizontalSpace(16),
+        _buildMetricCard(context, 'Pending Payouts', '\$4,200', Icons.hourglass_empty_rounded, CustomColors.amber),
+        context.horizontalSpace(16),
+        _buildMetricCard(context, 'Active Subscriptions', '142', Icons.sync_rounded, CustomColors.black),
+      ],
+    );
+  }
+
+  Widget _buildMetricCard(BuildContext context, String title, String value, IconData icon, Color color) {
+    return Expanded(
+      child: BorderdContainerWidget(
+        padding: context.appEdgeInsets(all: 24),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: context.sp(28)),
+            context.horizontalSpace(16),
             Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("\$ $price", style: CustomFonts.red13w500),
-                SizedBox(height: 5.h),
-                Icon(
-                  isSelected
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_off,
-                  color: isSelected
-                      ? CustomColors.lightBlueColor
-                      : Colors.grey.shade400,
-                ),
+                Text(value, style: context.fonts.black20w600),
+                Text(title, style: context.fonts.grey12w400),
               ],
             ),
           ],
@@ -246,40 +79,119 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
       ),
     );
   }
-}
 
-class CustomSizedSwitch extends StatefulWidget {
-  const CustomSizedSwitch({super.key});
-
-  @override
-  State<CustomSizedSwitch> createState() => _CustomSizedSwitchState();
-}
-
-class _CustomSizedSwitchState extends State<CustomSizedSwitch> {
-  bool isOn = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Transform.scale(
-      scale: 0.8,
-      child: SwitchTheme(
-        data: SwitchThemeData(
-          thumbColor: WidgetStateProperty.all(Colors.white),
-          trackColor: WidgetStateProperty.all(
-            isOn ? CustomColors.lightBlueColor : Colors.grey.shade400,
+  Widget _buildRecentTransactionsTable(BuildContext context) {
+    return BorderdContainerWidget(
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: context.appEdgeInsets(all: 20),
+            child: Text('Global Transactions', style: context.fonts.black20w600),
           ),
-          trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        ),
-        child: Switch(
-          value: isOn,
-          onChanged: (value) {
-            setState(() {
-              isOn = value;
-            });
-          },
-        ),
+          SizedBox(
+            height: context.h(300),
+            child: DataTable2(
+              columnSpacing: 24,
+              horizontalMargin: 20,
+              minWidth: 1000,
+              headingRowColor: WidgetStateProperty.all(CustomColors.softGrey),
+              columns: const [
+                DataColumn2(label: Text('DATE'), size: ColumnSize.M),
+                DataColumn2(label: Text('CLINIC'), size: ColumnSize.L),
+                DataColumn2(label: Text('AMOUNT'), size: ColumnSize.S),
+                DataColumn2(label: Text('COMMISSION'), size: ColumnSize.S),
+                DataColumn2(label: Text('STATUS'), size: ColumnSize.S),
+                DataColumn2(label: Text('ACTIONS'), size: ColumnSize.S),
+              ],
+              rows: List.generate(5, (index) => _transactionRow(context)),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  DataRow _transactionRow(BuildContext context) {
+    return DataRow(
+      cells: [
+        DataCell(Text('Oct 24, 14:20', style: context.fonts.black14w400)),
+        DataCell(Text('Radiant Skin Care', style: context.fonts.black14w400)),
+        DataCell(Text('\$250.00', style: context.fonts.black14w400)),
+        DataCell(Text('\$37.50', style: context.fonts.black14w400.copyWith(color: CustomColors.green))),
+        DataCell(_statusBadge('Completed')),
+        DataCell(
+          IconButton(
+            icon: const Icon(Icons.receipt_long_outlined, size: 20),
+            onPressed: () {
+              showDialog(context: context, builder: (_) => const TransactionDetailsDialog());
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPayoutRequestsTable(BuildContext context) {
+    return BorderdContainerWidget(
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: context.appEdgeInsets(all: 20),
+            child: Text('Pending Payouts', style: context.fonts.black20w600),
+          ),
+          SizedBox(
+            height: context.h(300),
+            child: DataTable2(
+              columnSpacing: 24,
+              horizontalMargin: 20,
+              minWidth: 1000,
+              headingRowColor: WidgetStateProperty.all(CustomColors.softGrey),
+              columns: const [
+                DataColumn2(label: Text('CLINIC'), size: ColumnSize.L),
+                DataColumn2(label: Text('REQUESTED AMOUNT'), size: ColumnSize.M),
+                DataColumn2(label: Text('BANK ACCOUNT'), size: ColumnSize.L),
+                DataColumn2(label: Text('ACTIONS'), size: ColumnSize.M),
+              ],
+              rows: List.generate(2, (index) => _payoutRow(context)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  DataRow _payoutRow(BuildContext context) {
+    return DataRow(
+      cells: [
+        DataCell(Text('Aura Med Spa', style: context.fonts.black14w400)),
+        DataCell(Text('\$1,450.00', style: context.fonts.black14w600)),
+        DataCell(Text('Chase Bank •••• 4421', style: context.fonts.grey13w500)),
+        DataCell(
+          ElevatedButton(
+            onPressed: () {},
+            style: ElevatedButton.styleFrom(
+              backgroundColor: CustomColors.purple,
+              minimumSize: Size(context.w(120), context.h(36)),
+            ),
+            child: const Text('Approve Payout'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _statusBadge(String status) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: CustomColors.green.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(status, style: CustomFonts.green14w600),
     );
   }
 }

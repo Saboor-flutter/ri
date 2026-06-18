@@ -1,171 +1,97 @@
-import 'package:country_picker/country_picker.dart';
+import 'package:country_code_picker/country_code_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
-import '../utills/color_constant.dart';
-import '../utills/custom_fonts.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:skinsync_admin/utils/theme.dart';
+import '../view_models/auth_view_model.dart';
 
-class PhoneWidget extends StatefulWidget {
+class PhoneWidget extends StatelessWidget {
   final TextEditingController controller;
   final ValueSetter<String>? onChanged;
-  final void Function(Country country)? onCountryChanged;
-  final String? initialCountryCode;
-  final bool showLabel;
   final bool filled;
-  final bool removeValidation;
+  final bool readOnly;
 
   const PhoneWidget({
     super.key,
     required this.controller,
     this.onChanged,
-    this.onCountryChanged,
-    this.initialCountryCode,
-    this.showLabel = true,
-    this.filled = false,
-    this.removeValidation = false,
+    this.readOnly = false,
+    this.filled = true,
   });
 
   @override
-  State<PhoneWidget> createState() => _PhoneWidgetState();
-}
-
-class _PhoneWidgetState extends State<PhoneWidget> {
-  final FocusNode _focusNode = FocusNode();
-  late Country _selectedCountry;
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedCountry = Country.parse(widget.initialCountryCode ?? 'US');
-  }
-
-  @override
-  void didUpdateWidget(covariant PhoneWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.initialCountryCode != null &&
-        widget.initialCountryCode != oldWidget.initialCountryCode) {
-      setState(() {
-        _selectedCountry = Country.parse(widget.initialCountryCode!);
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: 10.h,
-      children: [
-        TextFormField(
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter your phone number';
-            }
-            if (value.length < 9) {
-              return 'Phone number must be at least 9 digits';
-            }
-            return null; // Valid input
-          },
-          controller: widget.controller,
-          onChanged: widget.onChanged,
-          autofocus: false,
-          inputFormatters: [
-            LengthLimitingTextInputFormatter(11),
-            FilteringTextInputFormatter.digitsOnly,
-          ],
-          style: CustomFonts.black18w400,
-          onTapOutside: (_) {
-            _focusNode.unfocus();
-          },
-          keyboardType: TextInputType.phone,
-          decoration: InputDecoration(
-            hintText: '012 345 6798',
-            hintStyle: CustomFonts.grey18w400,
-            prefixIcon: _buildPhoneNumberPicker(context: context),
-          ),
-        ),
+    return TextFormField(
+      readOnly: readOnly,
+      controller: controller,
+      onChanged: onChanged,
+      inputFormatters: [
+        LengthLimitingTextInputFormatter(11),
+        FilteringTextInputFormatter.digitsOnly,
       ],
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Please enter phone number';
+        } else if (value.length < 7) {
+          return 'Please enter a valid phone number';
+        }
+        return null;
+      },
+      style: context.fonts.black14w400,
+      keyboardType: TextInputType.phone,
+      decoration: InputDecoration(
+        filled: filled,
+        fillColor: CustomColors.white,
+        hintText: 'Enter phone number',
+        hintStyle: context.fonts.grey14w400,
+        prefixIcon: _buildPhoneNumberPicker(context: context),
+        contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.r),
+          borderSide: const BorderSide(color: CustomColors.border, width: 1),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.r),
+          borderSide: const BorderSide(color: CustomColors.border, width: 1),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.r),
+          borderSide: const BorderSide(color: CustomColors.purple, width: 1),
+        ),
+      ),
     );
   }
 
-  IntrinsicHeight _buildPhoneNumberPicker({required BuildContext context}) {
-    return IntrinsicHeight(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          GestureDetector(
-            onTap: () {
-              // Open country picker dialog
-              showCountryPicker(
-                // countryCodeWidth: 45.w,
-                moveAlongWithKeyboard: true,
-                countryListTheme: CountryListThemeData(
-                  bottomSheetWidth: MediaQuery.sizeOf(context).width,
-                  bottomSheetHeight: 560.h,
-                  textStyle: TextStyle(fontSize: 14.sp, color: Colors.black),
-                  searchTextStyle: TextStyle(fontSize: 14.sp),
-                  margin: EdgeInsets.zero,
-                  padding: EdgeInsets.only(
-                    top: 15.h,
-                    bottom: 27.h,
-                    left: 20.w,
-                    right: 20.w,
-                  ),
-                ),
-                context: context,
-                showPhoneCode: true,
-                onSelect: (Country country) {
-                  setState(() {
-                    _selectedCountry = country;
-                  });
-                  if (widget.onCountryChanged != null) {
-                    widget.onCountryChanged!(country);
-                  }
-                },
-              );
-            },
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Padding(
-                  padding: EdgeInsets.only(left: 12.w, right: 4.w),
-                  child: Center(
-                    child: Text(
-                      _selectedCountry.flagEmoji,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14.sp),
-                    ),
-                  ),
-                ),
-                Center(
-                  child: Text(
-                    "+ ${_selectedCountry.phoneCode}",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: CustomColors.blackColor,
-                      fontSize: 14.sp,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.symmetric(vertical: 14.3.h),
-            child: const VerticalDivider(
-              color: Color(0xffE2E5E8),
-              thickness: 1,
-            ),
-          ),
-        ],
-      ),
+  Widget _buildPhoneNumberPicker({required BuildContext context}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Consumer(
+          builder: (context, ref, _) {
+            final authState = ref.watch(authViewModelProvider);
+            final authNotifier = ref.read(authViewModelProvider.notifier);
+            return AbsorbPointer(
+              absorbing: readOnly,
+              child: CountryCodePicker(
+                onChanged: authNotifier.setCountry,
+                dialogSize: Size(400.w, 500.h),
+                textStyle: context.fonts.black14w400,
+                initialSelection: authState.country?.code ?? 'US',
+                showCountryOnly: false,
+                showOnlyCountryWhenClosed: false,
+                alignLeft: false,
+                padding: EdgeInsets.zero,
+              ),
+            );
+          },
+        ),
+        Container(
+          height: 24.h,
+          width: 1.w,
+          color: CustomColors.border,
+          margin: EdgeInsets.symmetric(horizontal: 8.w),
+        ),
+      ],
     );
   }
 }

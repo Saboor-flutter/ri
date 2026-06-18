@@ -1,33 +1,37 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
-import '../utills/color_constant.dart';
 
-import '../utills/assets.dart';
+import '../utils/assets.dart';
+import '../utils/theme.dart';
 
 class AppLoader extends StatelessWidget {
-  const AppLoader({super.key});
+  final double? size;
+  final Color? color;
+  final double? value;
+  const AppLoader({super.key, this.size, this.color, this.value});
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    final boxSize = size ?? 100.w;
+    final imageSize = size ?? 50.w;
+    return Padding(
+      padding: EdgeInsets.all(10.w),
       child: SizedBox(
-        height: 60.w,
-        width: 60.w,
+        width: boxSize,
+        height: boxSize,
         child: Stack(
           children: [
             Center(
-              child: Image.asset(
-                PngAssets.splashLogo,
-                width: 50.w,
-                height: 50.w,
+              child: Transform.scale(
+                scale: 1.6,
+                child: CircularProgressIndicator(strokeWidth: 2, value: value),
               ),
             ),
-            SizedBox(
-              height: 60.w,
-              width: 60.w,
-              child: const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation(
-                  CustomColors.lightPurpleColor,
+            Positioned.fill(
+              child: Center(
+                child: Image.asset(
+                  PngAssets.splashLogo,
+                  width: imageSize,
+                  height: imageSize,
                 ),
               ),
             ),

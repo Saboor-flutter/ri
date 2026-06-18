@@ -4,18 +4,50 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../exceptions/app_exception.dart';
-
 abstract class BaseViewModel<S> extends Notifier<S> {
   final S initialState;
 
-  BaseViewModel({required this.initialState});
+  BaseViewModel(this.initialState);
 
   @override
   S build() {
     init();
     ref.onDispose(dispose);
     return initialState;
+  }
+
+  Future<T?> runSafely<T>(
+    AsyncValueGetter<T> action, {
+    bool showLoading = true,
+    bool showError = true,
+    void Function(bool)? onLoadingChange,
+  }) async {
+    try {
+      if (showLoading) {
+        EasyLoading.show();
+      }
+
+      onLoadingChange?.call(true);
+
+      return await action.call();
+    } catch (e, s) {
+      log('BASE: $e', stackTrace: s);
+      if (showError) {
+        onError(e.toString().replaceAll('Exception:', ''));
+      }
+      return null;
+    } finally {
+      onLoadingChange?.call(false);
+
+      if (showLoading) {
+        EasyLoading.dismiss();
+      }
+    }
+  }
+
+  @mustCallSuper
+  void onError(String message) {
+    EasyLoading.showError(message);
   }
 
   @mustCallSuper
@@ -26,24 +58,5 @@ abstract class BaseViewModel<S> extends Notifier<S> {
   @mustCallSuper
   void dispose() {
     log('$runtimeType DISPOSED', name: 'RIVERPOD');
-  }
-
-  Future<T?> runSafely<T>(AsyncValueGetter<T> action) async {
-    try {
-      return await action.call();
-    } on AppException catch (e, s) {
-      log(e.message, stackTrace: s);
-      onError(e.message);
-      return null;
-    } catch (e, s) {
-      log(e.toString(), stackTrace: s);
-      onError(e.toString().replaceAll('Exception:', ''));
-      return null;
-    }
-  }
-
-  @mustCallSuper
-  void onError(String message) {
-    EasyLoading.showError(message);
   }
 }

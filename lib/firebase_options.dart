@@ -17,16 +17,19 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
-        return android;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for android - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
       case TargetPlatform.iOS:
-        return ios;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for ios - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
@@ -49,24 +52,13 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBKG-wtOds3eQ1tLBR3j-uBfg5CPPlvw-w',
-    appId: '1:55541632083:android:250cd09d1fe64b6d90caa6',
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyBEhsYAXbuXh0feNcZPOUSfBHWC2uVW3U4',
+    appId: '1:55541632083:web:4eda17b719be759190caa6',
     messagingSenderId: '55541632083',
     projectId: 'skinsync-2aa8e',
+    authDomain: 'skinsync-2aa8e.firebaseapp.com',
     storageBucket: 'skinsync-2aa8e.firebasestorage.app',
-  );
-
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBgT0S6-AInuNw-DvBa2mBLRhp2lkmvIyo',
-    appId: '1:55541632083:ios:aee65901cda970e990caa6',
-    messagingSenderId: '55541632083',
-    projectId: 'skinsync-2aa8e',
-    storageBucket: 'skinsync-2aa8e.firebasestorage.app',
-    androidClientId:
-        '55541632083-09c7mg023dhonqchhaj1tm08ot60d7uq.apps.googleusercontent.com',
-    iosClientId:
-        '55541632083-1ck0pteg4gso7kbjrm1e1hsq74qp9jsm.apps.googleusercontent.com',
-    iosBundleId: 'com.skinsyncaiinc.skinsyncai',
+    measurementId: 'G-W87QHZ5YQB',
   );
 }

@@ -1,42 +1,40 @@
-import 'auth_response.dart';
 import 'base_response_model.dart';
 
-class RefreshTokenResponse extends BaseResponseModel {
-  final RefreshTokenData? data;
-
-  RefreshTokenResponse({super.status, super.message, this.data});
+class RefreshTokenResponse extends BaseApiResponseModel<RefreshTokenData> {
+  RefreshTokenResponse({
+    required super.status,
+    required super.message,
+    super.data,
+  });
 
   factory RefreshTokenResponse.fromJson(Map<String, dynamic> json) =>
       RefreshTokenResponse(
-        status: json["is_success"],
-        message: json["message"],
-        data: json["data"] == null
+        status: json['status'],
+        message: json['message'],
+        data: json['data'] == null
             ? null
-            : RefreshTokenData.fromJson(json["data"]),
+            : RefreshTokenData.fromJson(json['data']),
       );
 }
 
 class RefreshTokenData {
-  final String? accessToken;
-  final String? refreshToken;
-  final int? accessExpiresAt;
-  final int? refreshExpiresAt;
-  final User? user;
+  final String accessToken;
+  final String refreshToken;
+  final int accessExpiresAt;
+  final int refreshExpiresAt;
 
-  RefreshTokenData({
-    this.accessToken,
-    this.refreshToken,
-    this.accessExpiresAt,
-    this.refreshExpiresAt,
-    this.user,
+  const RefreshTokenData({
+    required this.accessToken,
+    required this.refreshToken,
+    required this.accessExpiresAt,
+    required this.refreshExpiresAt,
   });
 
   factory RefreshTokenData.fromJson(Map<String, dynamic> json) =>
       RefreshTokenData(
-        accessToken: json["access_token"],
-        refreshToken: json["refresh_token"],
-        accessExpiresAt: json["access_expires_at"],
-        refreshExpiresAt: json["refresh_expires_at"],
-        user: json["user"] == null ? null : User.fromJson(json["user"]),
+        accessToken: json['access_token'],
+        refreshToken: json['refresh_token'],
+        accessExpiresAt: json['access_expires_at'],
+        refreshExpiresAt: json['refresh_expires_at'],
       );
 }

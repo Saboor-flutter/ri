@@ -1,29 +1,14 @@
-import '../models/requests/onboarding_profile_request.dart';
-import '../models/requests/otp_request.dart';
-import '../models/responses/base_response_model.dart';
+import 'package:skinsync_admin/models/responses/base_response_model.dart';
 
-import '../models/requests/sign_in_request.dart';
-import '../models/responses/auth_response.dart';
+import '../models/requests/auth_req_models.dart';
+import '../models/responses/login_response_model.dart';
 
 abstract class AuthRepository {
-  Future<BaseResponseModel> signInApi({
-    required BaseSignInRequest signInRequest,
-  });
-  Future<BaseResponseModel> biometricRegisterApi();
-  Future<AuthResponse> biometricLoginApi();
-  Future<BaseResponseModel> biometricUnregister();
-  Future<AuthResponse> verifyOTP({required OtpRequest otpRequest});
-
-  Future<BaseResponseModel> onboardingProfile({
-    required OnBoardingProfileRequest onBoardingProfileRequest,
-  });
-  Future<AuthResponse> getMe();
-
-  Future<AuthResponse> googleSignInApi({
-    required SocialLoginRequest request,
-  });
-
-  Future<AuthResponse> appleSignInApi({
-    required SocialLoginRequest request,
+  Future<LoginResponseModel> login({required LoginRequestModel req});
+  Future<BaseApiResponseModel> forgotPassword({required String email});
+  Future<String> verifyOtp({required String email, required String otp});
+  Future<BaseApiResponseModel> reSendOtp({required String email});
+  Future<BaseApiResponseModel> resetPassword({
+    required ResetPasswordReqModel req,
   });
 }

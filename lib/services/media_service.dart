@@ -2,6 +2,7 @@ import 'dart:developer';
 import 'dart:io';
 
 import 'package:camera/camera.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:http/http.dart';
 import 'package:path_provider/path_provider.dart';
@@ -19,10 +20,53 @@ class MediaService {
   }
 
   Future<String?> uploadImage(String path, XFile image) async {
-    final ref = _storage.ref().child('$path/${image.name}');
-    final task = ref.putData(await image.readAsBytes());
+    final storagePath = '$path/${image.name}';
+    final ref = _storage.ref().child(storagePath);
+    final metadata = SettableMetadata(
+      contentType: _imageContentType(image.name),
+    );
+    final task = ref.putData(await image.readAsBytes(), metadata);
     await task.whenComplete(() {});
-    return await ref.getDownloadURL();
+    final url = await ref.getDownloadURL();
+    log('Uploaded image path: $storagePath');
+    log('Uploaded image URL: $url');
+    return url;
+  }
+
+  String _imageContentType(String fileName) {
+    final ext = fileName.split('.').last.toLowerCase();
+    return switch (ext) {
+      'png' => 'image/png',
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'gif' => 'image/gif',
+      'webp' => 'image/webp',
+      _ => 'image/jpeg',
+    };
+  }
+
+  Future<String?> uploadFile(String path, PlatformFile file) async {
+    final storagePath = '$path/${file.name}';
+    final ref = _storage.ref().child(storagePath);
+    final metadata = SettableMetadata(
+      contentType: file.extension == 'pdf'
+          ? 'application/pdf'
+          : 'application/octet-stream',
+    );
+
+    if (file.bytes != null) {
+      final task = ref.putData(file.bytes!, metadata);
+      await task.whenComplete(() {});
+    } else if (file.path != null) {
+      final task = ref.putFile(File(file.path!), metadata);
+      await task.whenComplete(() {});
+    } else {
+      throw Exception('File data not available');
+    }
+
+    final url = await ref.getDownloadURL();
+    log('Uploaded file path: $storagePath');
+    log('Uploaded file URL: $url');
+    return url;
   }
 
   Future<XFile?> downloadSimulationImage({

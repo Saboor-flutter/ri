@@ -1,76 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'utills/assets.dart';
-import 'view_models/theme_view_model.dart';
 
 import 'route_generator.dart';
-import 'utills/color_constant.dart';
-import 'utills/screen_size.dart';
-import 'utills/theme.dart';
+import 'utils/screen_size.dart';
+import 'utils/theme.dart';
+import 'widgets/app_loader.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
-
-void configLoading() {
-  EasyLoading.instance
-    ..displayDuration = const Duration(milliseconds: 2000)
-    ..loadingStyle = EasyLoadingStyle.custom
-    ..indicatorType = EasyLoadingIndicatorType.fadingCircle
-    // ..loadingStyle = EasyLoadingStyle.dark
-    ..indicatorSize = 50.w
-    ..radius = 10.0
-    ..progressColor = Colors.white
-    ..backgroundColor = CustomColors.blackColor
-    ..indicatorColor = Colors.white
-    ..textColor = Colors.white
-    ..indicatorWidget = SizedBox(
-      height: 60.w,
-      width: 60.w,
-      child: Stack(
-        children: [
-          Center(
-            child: Image.asset(PngAssets.splashLogo, width: 50.w, height: 50.w),
-          ),
-          SizedBox(
-            height: 60.w,
-            width: 60.w,
-            child: const CircularProgressIndicator(),
-          ),
-        ],
-      ),
-    )
-    // ..maskColor = Colors.black.withOpacity(0.5)
-    ..userInteractions = true
-    ..dismissOnTap = false;
-}
 
 class AppInit extends StatelessWidget {
   const AppInit({super.key});
 
+  void configLoading() {
+    EasyLoading.instance
+      ..displayDuration = const Duration(milliseconds: 2000)
+      ..loadingStyle = EasyLoadingStyle.custom
+      ..indicatorType = EasyLoadingIndicatorType.fadingCircle
+      ..indicatorSize = 40.0
+      ..radius = 12.0
+      ..progressColor = CustomColors.white
+      ..backgroundColor = CustomColors.white
+      ..indicatorColor = CustomColors.purple
+      ..textColor = CustomColors.black
+      ..maskColor = CustomColors.black.withValues(alpha: 0.4)
+      ..indicatorWidget = const AppLoader(size: 50)
+      ..userInteractions = true
+      ..dismissOnTap = false;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ScreenUtilInit(
-      designSize: getDesignSize(context: context),
+    configLoading();
+
+    return ScreenUtilPlusInit(
+      designSize: getDesignSize(context),
       ensureScreenSize: true,
       minTextAdapt: true,
       splitScreenMode: true,
-      builder: (_, child) {
-        configLoading();
-        return Consumer(
-          builder: (context, ref, child) {
-            final ThemeMode themeMode = ref.watch(themeViewModel);
-            return MaterialApp(
-              navigatorKey: navigatorKey,
-              debugShowCheckedModeBanner: false,
-              title: 'SkinSync AI',
-              initialRoute: '/',
-              onGenerateRoute: RouteGenerator.generateRoute,
-              themeMode: themeMode,
-              theme: AppTheme.lightTheme,
-              darkTheme: AppTheme.darkTheme,
-              builder: EasyLoading.init(),
-            );
+      autoRebuild: false,
+      builder: (context, child) {
+        return MaterialApp.router(
+          debugShowCheckedModeBanner: false,
+          title: 'SkinSync Admin',
+          routerConfig: RouteGenerator.router,
+          themeMode: ThemeMode.light,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          builder: (context, child) {
+            return EasyLoading.init()(context, child);
           },
         );
       },

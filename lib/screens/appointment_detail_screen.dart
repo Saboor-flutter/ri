@@ -1,310 +1,257 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:intl/intl.dart';
-import '../models/dummy_list_model.dart';
-import '../utills/color_constant.dart';
-import '../utills/custom_fonts.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:skinsync_admin/screens/bottom_nav_screens/appointment_management.dart';
+import 'package:skinsync_admin/utils/theme.dart';
+import 'package:skinsync_admin/widgets/borderd_container_widget.dart';
+import 'package:skinsync_admin/widgets/gradient_scaffold.dart';
 
-class AppointmentDetailScreen extends StatelessWidget {
-  final DummyAppointment appointment;
+class SelectedAppointmentNotifier extends Notifier<AppointmentDummyModel?> {
+  @override
+  AppointmentDummyModel? build() => null;
+  void set(AppointmentDummyModel? a) => state = a;
+}
 
-  const AppointmentDetailScreen({super.key, required this.appointment});
+final selectedAppointmentProvider = NotifierProvider<SelectedAppointmentNotifier, AppointmentDummyModel?>(
+  SelectedAppointmentNotifier.new,
+);
+
+class AppointmentDetailScreen extends ConsumerWidget {
+  static const String routeName = '/appointment-detail';
+  const AppointmentDetailScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final bool hasHistory = appointment.type != "Provisional Booking";
+  Widget build(BuildContext context, WidgetRef ref) {
+    final appointment = ref.watch(selectedAppointmentProvider);
 
-    return DefaultTabController(
-      length: hasHistory ? 2 : 1,
-      child: Scaffold(
-        backgroundColor: Colors.grey.shade50,
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          centerTitle: false,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black, size: 20),
-            onPressed: () => Navigator.pop(context),
-          ),
-          title: Text("Appointment Detail", style: CustomFonts.black22w600),
-          bottom: hasHistory
-              ? TabBar(
-                  labelColor: CustomColors.darkPurple,
-                  unselectedLabelColor: Colors.grey,
-                  indicatorColor: CustomColors.darkPurple,
-                  indicatorSize: TabBarIndicatorSize.label,
-                  labelStyle: CustomFonts.black14w600,
-                  tabs: const [
-                    Tab(text: "Details"),
-                    Tab(text: "Treatment History"),
-                  ],
-                )
-              : null,
-        ),
-        body: TabBarView(
-          children: [
-            _buildDetailsTab(),
-            if (hasHistory) _buildHistoryTab(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDetailsTab() {
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(20.w),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildInfoSection(
-            title: "Appointment Information",
-            children: [
-              _buildDetailRow("Type", appointment.type, isType: true),
-              _buildDetailRow("Date", DateFormat('EEEE, MMM d, yyyy').format(appointment.date)),
-              _buildDetailRow("Time Slot", appointment.time),
-              _buildDetailRow("Status", appointment.status, isStatus: true),
-            ],
-          ),
-          SizedBox(height: 20.h),
-          _buildInfoSection(
-            title: "Treatment Details",
-            children: [
-              _buildDetailRow("Treatment", appointment.treatmentName),
-              _buildDetailRow("Target Area", appointment.area),
-            ],
-          ),
-          SizedBox(height: 20.h),
-          _buildInfoSection(
-            title: "Clinic & Provider",
-            children: [
-              _buildDetailRow("Clinic", appointment.clinicName, icon: Icons.business_outlined),
-              _buildDetailRow("Doctor", appointment.doctorName, icon: Icons.person_outline),
-            ],
-          ),
-          SizedBox(height: 20.h),
-          _buildInfoSection(
-            title: "Notes & Remarks",
-            children: [
-              Padding(
-                padding: EdgeInsets.symmetric(vertical: 8.h),
-                child: Text(
-                  appointment.notes,
-                  style: CustomFonts.black14w400.copyWith(height: 1.5, color: Colors.grey.shade700),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHistoryTab() {
-    if (appointment.pastSessions.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.history_toggle_off_rounded, size: 64.sp, color: Colors.grey.shade300),
-            SizedBox(height: 16.h),
-            Text("No past treatment history found", style: CustomFonts.grey16w400),
-          ],
+    if (appointment == null) {
+      return GradientScaffold(
+        body: Center(
+          child: Text('No Appointment Data Found', style: context.fonts.black16w400),
         ),
       );
     }
 
-    // Grouping for session timeline summary
-    int totalSessions = appointment.pastSessions.where((s) => s.type == "Session").length;
-    int totalFollowups = appointment.pastSessions.where((s) => s.type == "Follow-up").length;
-
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(20.w),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: EdgeInsets.all(16.w),
-            decoration: BoxDecoration(
-              color: CustomColors.darkPurple.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(12.r),
-              border: Border.all(color: CustomColors.darkPurple.withValues(alpha: 0.1)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+    return GradientScaffold(
+      appBar: AppBar(
+        flexibleSpace: AppDecorations.appBarGradient,
+        title: Text('Appointment Details', style: context.fonts.black18w600),
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: CustomColors.black),
+          onPressed: () => context.pop(),
+        ),
+      ),
+      body: SingleChildScrollView(
+        padding: context.appEdgeInsets(horizontal: 24, vertical: 32),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: context.w(1000)),
+            child: Column(
               children: [
-                _buildSummaryStat("Sessions", totalSessions.toString()),
-                Container(width: 1, height: 30.h, color: CustomColors.darkPurple.withValues(alpha: 0.2)),
-                _buildSummaryStat("Follow-ups", totalFollowups.toString()),
+                _buildHeaderSection(context, appointment),
+                context.verticalSpace(32),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 3, child: _buildMainContent(context, appointment)),
+                    context.horizontalSpace(32),
+                    Expanded(flex: 2, child: _buildSidebar(context, appointment)),
+                  ],
+                ),
               ],
             ),
           ),
-          SizedBox(height: 25.h),
-          Text("Timeline", style: CustomFonts.black18w600),
-          SizedBox(height: 15.h),
-          ...appointment.pastSessions.map((session) => _buildHistoryTimelineEntry(session)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeaderSection(BuildContext context, AppointmentDummyModel a) {
+    return BorderdContainerWidget(
+      padding: context.appEdgeInsets(all: 32),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 40.r,
+            backgroundColor: CustomColors.palePurple,
+            child: Text(a.patientName[0], style: context.fonts.purple16w700),
+          ),
+          context.horizontalSpace(32),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        a.patientName,
+                        style: context.fonts.black26w700,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    context.horizontalSpace(16),
+                    _statusBadge(context, a.status),
+                  ],
+                ),
+                context.verticalSpace(8),
+                Text('${a.treatment} • ${a.clinic}', style: context.fonts.purple14w600),
+                context.verticalSpace(16),
+                Wrap(
+                  spacing: 12.w,
+                  runSpacing: 12.h,
+                  children: [
+                    _infoChip(context, Icons.calendar_today_outlined, 'Scheduled: ${a.dateTime}'),
+                    _infoChip(context, Icons.person_outline_rounded, 'Provider: ${a.provider}'),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSummaryStat(String label, String value) {
+  Widget _buildMainContent(BuildContext context, AppointmentDummyModel a) {
     return Column(
       children: [
-        Text(value, style: CustomFonts.black20w600.copyWith(color: CustomColors.darkPurple)),
-        Text(label, style: CustomFonts.grey14w400.copyWith(fontSize: 12.sp)),
+        _infoSection(context, 'Appointment & Schedule details', [
+          _detailRow(context, 'Consultation / Service Type', a.type),
+          _detailRow(context, 'Assigned Practitioner', a.provider),
+          _detailRow(context, 'Scheduled Session Time', a.dateTime),
+          _detailRow(context, 'Est. Duration', '45 Minutes'),
+        ]),
+        context.verticalSpace(24),
+        _infoSection(context, 'Patient Record Summary', [
+          _detailRow(context, 'Patient Name', a.patientName),
+          _detailRow(context, 'Contact Email', a.patientEmail),
+          _detailRow(context, 'Assigned Home Clinic', a.clinic),
+        ]),
+        context.verticalSpace(24),
+        _infoSection(context, 'Internal Clinical Notes', [
+          Text(
+            'Patient requested a focused skin review prior to starting the ${a.treatment} session. Please monitor baseline redness and lot history codes for skin suitability.',
+            style: context.fonts.grey14w400h16,
+          ),
+        ]),
       ],
     );
   }
 
-  Widget _buildHistoryTimelineEntry(DummySession session) {
-    bool isSession = session.type == "Session";
+  Widget _buildSidebar(BuildContext context, AppointmentDummyModel a) {
+    return Column(
+      children: [
+        _infoSection(context, 'Performance Directory', [
+          _statRow(context, Icons.local_hospital_outlined, 'Associated Clinic', a.clinic),
+          _statRow(context, Icons.payments_outlined, 'Est. Revenue', '\$150.00'),
+        ]),
+        context.verticalSpace(24),
+        _infoSection(context, 'Activity Tracking Log', [
+          _timelineStep(context, '09:12 AM', 'Appointment Booked', 'Processed automatically via mobile application gateway.'),
+          context.verticalSpace(16),
+          _timelineStep(context, '09:30 AM', 'Practitioner Confirmed', 'Assigned practitioner ${a.provider} accepted request.'),
+        ]),
+      ],
+    );
+  }
 
-    return Container(
-      margin: EdgeInsets.only(bottom: 20.h),
-      padding: EdgeInsets.only(left: 15.w),
-      decoration: BoxDecoration(
-        border: Border(left: BorderSide(color: isSession ? CustomColors.darkPurple : Colors.orange, width: 3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _timelineStep(BuildContext context, String time, String title, String desc) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.check_circle_rounded, color: CustomColors.green, size: context.sp(16)),
+        context.horizontalSpace(12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                DateFormat('dd MMM yyyy').format(session.date),
-                style: CustomFonts.black16w600,
-              ),
-              _buildSmallBadge(session.type, isSession ? CustomColors.darkPurple : Colors.orange),
+              Text(title, style: context.fonts.black14w600),
+              context.verticalSpace(2),
+              Text(time, style: context.fonts.grey11w400),
+              context.verticalSpace(4),
+              Text(desc, style: context.fonts.grey12w400),
             ],
           ),
-          SizedBox(height: 8.h),
-          _buildHistoryInfoRow(Icons.business_outlined, session.clinicName),
-          _buildHistoryInfoRow(Icons.person_outline, session.doctorName),
-          SizedBox(height: 12.h),
-          Text("Outcome:", style: CustomFonts.black14w600.copyWith(fontSize: 12.sp)),
-          Text(session.outcome, style: CustomFonts.black14w400.copyWith(color: Colors.grey.shade700, fontSize: 13.sp)),
-          if (isSession) ...[
-            SizedBox(height: 12.h),
-            Row(
-              children: [
-                _buildProductDetail("Products", session.products.join(", ")),
-                SizedBox(width: 20.w),
-                _buildProductDetail("Materials", session.materials),
-              ],
-            ),
-            SizedBox(height: 12.h),
-            Text("Post-Care Instructions:", style: CustomFonts.black14w600.copyWith(fontSize: 12.sp)),
-            Text(session.postCare, style: CustomFonts.black14w400.copyWith(color: Colors.grey.shade700, fontSize: 13.sp)),
-          ],
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildProductDetail(String label, String value) {
-    return Expanded(
+  Widget _infoSection(BuildContext context, String title, List<Widget> children) {
+    return BorderdContainerWidget(
+      padding: context.appEdgeInsets(all: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: CustomFonts.black14w600.copyWith(fontSize: 12.sp)),
-          Text(value, style: CustomFonts.black14w400.copyWith(color: Colors.grey.shade600, fontSize: 13.sp)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHistoryInfoRow(IconData icon, String text) {
-    return Padding(
-      padding: EdgeInsets.only(top: 4.h),
-      child: Row(
-        children: [
-          Icon(icon, size: 14.sp, color: Colors.grey),
-          SizedBox(width: 8.w),
-          Text(text, style: CustomFonts.black14w400.copyWith(color: Colors.grey.shade600, fontSize: 13.sp)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoSection({required String title, required List<Widget> children}) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(16.w),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16.r),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: CustomFonts.black16w600.copyWith(color: CustomColors.darkPurple)),
-          SizedBox(height: 10.h),
-          const Divider(height: 1),
-          SizedBox(height: 5.h),
+          Text(title, style: context.fonts.black16w700),
+          context.verticalSpace(24),
           ...children,
         ],
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value, {bool isType = false, bool isStatus = false, IconData? icon}) {
-    Color? textColor;
-    if (isType) {
-      switch (value) {
-        case "Consultation": textColor = Colors.blue; break;
-        case "Sessions": textColor = Colors.green; break;
-        case "Follow-Up / Touch-Up": textColor = Colors.purple; break;
-        case "Provisional Booking": textColor = Colors.orange; break;
-      }
-    }
-    if (isStatus) textColor = Colors.green;
-
+  Widget _detailRow(BuildContext context, String label, String value) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 10.h),
-      child: Row(
+      padding: context.appEdgeInsets(bottom: 16),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (icon != null) ...[
-            Icon(icon, size: 18.sp, color: Colors.grey.shade400),
-            SizedBox(width: 10.w),
-          ],
-          Text("$label:", style: CustomFonts.grey15w400.copyWith(fontWeight: FontWeight.w600)),
-          const Spacer(),
-          Expanded(
-            flex: 2,
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: CustomFonts.black16w600.copyWith(
-                color: textColor ?? Colors.black87,
-                fontSize: 15.sp,
-              ),
-            ),
-          ),
+          Text(label, style: context.fonts.grey13w500),
+          context.verticalSpace(4),
+          Text(value, style: context.fonts.black14w600),
         ],
       ),
     );
   }
 
-  Widget _buildSmallBadge(String text, Color color) {
+  Widget _statRow(BuildContext context, IconData icon, String label, String value) {
+    return Padding(
+      padding: context.appEdgeInsets(bottom: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: context.sp(18), color: CustomColors.grey),
+              context.horizontalSpace(12),
+              Text(label, style: context.fonts.grey13w500),
+            ],
+          ),
+          Flexible(child: Text(value, style: context.fonts.grey14w600, overflow: TextOverflow.ellipsis)),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusBadge(BuildContext context, String status) {
+    final bool isCompleted = status.toLowerCase() == 'completed' || status.toLowerCase() == 'confirmed';
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+      padding: context.appEdgeInsets(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(6.r),
+        color: isCompleted ? CustomColors.green.withValues(alpha: 0.1) : CustomColors.amber.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20.r),
       ),
       child: Text(
-        text,
-        style: TextStyle(color: color, fontSize: 10.sp, fontWeight: FontWeight.bold),
+        status.toUpperCase(),
+        style: isCompleted ? context.fonts.green10w700 : context.fonts.amber10w800ls1,
+      ),
+    );
+  }
+
+  Widget _infoChip(BuildContext context, IconData icon, String label) {
+    return Container(
+      padding: context.appEdgeInsets(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(color: CustomColors.whiteGrey, borderRadius: BorderRadius.circular(8.r)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: context.sp(14), color: CustomColors.grey),
+          context.horizontalSpace(8),
+          Text(label, style: context.fonts.grey13w500),
+        ],
       ),
     );
   }
