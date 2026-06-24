@@ -34,7 +34,7 @@ class CreateCategoryResquest {
     "name": name,
     "icon": icon,
     "parent_id": parentId,
-    "imageUrl" : imageUrl,
+   // "imageUrl" : imageUrl,
     "total_sessions": totalSessions,
     "consent_form_url": consentFormUrl,
     "consent_form_name": consentFormName,

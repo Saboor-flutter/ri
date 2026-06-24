@@ -122,7 +122,10 @@ class CategoryViewModel extends BaseViewModel<CategoryState> {
     return await runSafely(
       onLoadingChange: (loading) => state = state.copyWith(loading: loading),
       () async {
-        await _categoryRepository.createCategory(request);
+        final response = await _categoryRepository.createCategory(request);
+        if (response.isSuccess) {
+          await fetchCategories();
+        }
         return true;
       },
     );

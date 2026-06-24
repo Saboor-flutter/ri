@@ -9,10 +9,11 @@ import '../../widgets/app_search_field.dart';
 import '../../widgets/borderd_container_widget.dart';
 import '../../widgets/custom_dropdown_widget.dart';
 import '../../widgets/custom_primary_button.dart';
-import '../../widgets/dailogbox/product_dailogboxs.dart';
 import '../../widgets/gradient_scaffold.dart';
 import '../../widgets/number_paginator.dart';
+import '../create_product_screen.dart';
 import '../product_detail_screen.dart';
+import '../../widgets/custom_cashed_image_widget.dart';
 
 class ProductManagement extends ConsumerStatefulWidget {
   const ProductManagement({super.key});
@@ -27,14 +28,11 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
   String _selectedPurposeFilter = 'All Purposes';
   String _selectedTrackingFilter = 'All Statuses';
 
-  int _currentPage = 0;
-  static const int _itemsPerPage = 5;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(productViewModelProvider.notifier).getProducts();
+      ref.read(productViewModelProvider.notifier).fetchProducts(page: 1, limit: 20);
     });
   }
 
@@ -47,7 +45,7 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(productViewModelProvider);
-    final catalogProducts = state.products ?? [];
+    final catalogProducts = state.products;
 
     // Filter products dynamically
     final filteredProducts = catalogProducts.where((p) {
@@ -72,11 +70,7 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
       return matchesQuery && matchesPurpose && matchesTracking;
     }).toList();
 
-    final totalPages = (filteredProducts.length / _itemsPerPage).ceil();
-    final paginatedProducts = filteredProducts
-        .skip(_currentPage * _itemsPerPage)
-        .take(_itemsPerPage)
-        .toList();
+    final paginatedProducts = filteredProducts;
 
     return GradientScaffold(
       body: SingleChildScrollView(
@@ -91,17 +85,19 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
             _buildFilters(),
             SizedBox(height: 24.h),
             _buildCatalogTable(paginatedProducts),
-            if (totalPages > 1)
+            if (state.totalPages >= 1)
               Padding(
                 padding: context.appEdgeInsets(vertical: 24),
                 child: Center(
                   child: NumberPaginator(
-                    totalPages: totalPages,
-                    currentPage: _currentPage,
+                    totalPages: state.totalPages,
+                    currentPage: state.currentPage - 1,
                     onPageChanged: (pageIndex) {
-                      setState(() {
-                        _currentPage = pageIndex;
-                      });
+                      ref.read(productViewModelProvider.notifier).fetchProducts(
+                            search: state.searchKeyword,
+                            page: pageIndex + 1,
+                            limit: state.pageSize,
+                          );
                     },
                   ),
                 ),
@@ -129,10 +125,7 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
         ),
         CustomPrimaryButton(
           onTap: () {
-            showDialog(
-              context: context,
-              builder: (context) => const ProductDialogBox(product: null),
-            );
+            context.push(CreateProductScreen.routeName, extra: null);
           },
           icon: Icons.add_circle_outline,
           label: 'Create Catalog Product',
@@ -144,7 +137,7 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
 
   Widget _buildCatalogOverview() {
     final state = ref.watch(productViewModelProvider);
-    final catalogProducts = state.products ?? [];
+    final catalogProducts = state.products;
 
     final totalSkus = catalogProducts.length;
     final totalBrands = catalogProducts.map((p) => p.brand).toSet().length;
@@ -232,6 +225,7 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
   }
 
   Widget _buildFilters() {
+    final state = ref.watch(productViewModelProvider);
     return BorderdContainerWidget(
       padding: EdgeInsets.all(16.w),
       child: Row(
@@ -243,9 +237,11 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
               hintText:
                   'Search master catalog by product name, SKU or brand manufacturer...',
               onChanged: (val) {
-                setState(() {
-                  _currentPage = 0;
-                });
+                ref.read(productViewModelProvider.notifier).fetchProducts(
+                      search: val,
+                      page: 1,
+                      limit: state.pageSize,
+                    );
               },
             ),
           ),
@@ -266,7 +262,6 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
               onChanged: (val) {
                 setState(() {
                   _selectedPurposeFilter = val ?? 'All Purposes';
-                  _currentPage = 0;
                 });
               },
             ),
@@ -285,7 +280,6 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
               onChanged: (val) {
                 setState(() {
                   _selectedTrackingFilter = val ?? 'All Statuses';
-                  _currentPage = 0;
                 });
               },
             ),
@@ -400,16 +394,20 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
       child: Row(
         children: [
-          Container(
-            width: 48.w,
-            height: 48.w,
-            decoration: BoxDecoration(
-              color: CustomColors.whiteGrey,
-              borderRadius: BorderRadius.circular(8.r),
-              image: DecorationImage(
-                image: NetworkImage(product.image),
-                fit: BoxFit.cover,
-              ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8.r),
+            child: SizedBox(
+              width: 48.w,
+              height: 48.w,
+              child: product.image.isEmpty
+                  ? const DecoratedBox(
+                      decoration: BoxDecoration(color: CustomColors.whiteGrey),
+                      child: Icon(Icons.broken_image, color: CustomColors.grey),
+                    )
+                  : CustomCachedImage(
+                      imageUrl: product.image,
+                      fit: BoxFit.cover,
+                    ),
             ),
           ),
           SizedBox(width: 16.w),
@@ -526,9 +524,19 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
               color: CustomColors.grey,
               size: 20.sp,
             ),
-            onPressed: () {
-              ref.read(selectedProductProvider.notifier).state = product;
-              context.push(ProductDetailScreen.routeName);
+            onPressed: () async {
+              if (product.id != null) {
+                try {
+                  await ref
+                      .read(productViewModelProvider.notifier)
+                      .fetchProductDetail(product.id!);
+                  if (context.mounted) {
+                    context.push(ProductDetailScreen.routeName);
+                  }
+                } catch (e) {
+                  // Error handled gracefully by runSafely wrapper
+                }
+              }
             },
           ),
           IconButton(
@@ -539,10 +547,7 @@ class _ProductManagementState extends ConsumerState<ProductManagement> {
               size: 20.sp,
             ),
             onPressed: () {
-              showDialog(
-                context: context,
-                builder: (context) => ProductDialogBox(product: product),
-              );
+              context.push(CreateProductScreen.routeName, extra: product);
             },
           ),
           IconButton(

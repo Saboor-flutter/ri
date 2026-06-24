@@ -1,3 +1,28 @@
+import 'package:skinsync_admin/models/responses/base_response_model.dart';
+
+class ProductResponse extends BaseApiResponseModel<ProductModel> {
+  const ProductResponse({
+    required super.isSuccess,
+    required super.message,
+    super.data,
+  });
+
+  factory ProductResponse.fromJson(Map<String, dynamic> json) =>
+      ProductResponse(
+        isSuccess: (json['is_success'] as bool?) ?? false,
+        message: json['message'] ?? '',
+        data: json['data'] == null
+            ? null
+            : ProductModel.fromJson(json['data'] as Map<String, dynamic>),
+      );
+
+  Map<String, dynamic> toJson() => {
+    'is_success': isSuccess,
+    'message': message,
+    'data': data?.toJson(),
+  };
+}
+
 class ProductModel {
   final int? id;
   final String image;
@@ -16,6 +41,7 @@ class ProductModel {
   final String? productPurpose;
   final String? unitType;
   final bool? enforceLotTracking;
+  final String? usageType;
 
   // New packaging fields
   final String? packageType;
@@ -33,6 +59,8 @@ class ProductModel {
   final String? supplier;
   final String? lotNumber;
   final DateTime? expirationDate;
+  final List<int>? selectedCategoryIds;
+  final String? barcode;
 
   ProductModel({
     this.id,
@@ -50,6 +78,7 @@ class ProductModel {
     this.productPurpose,
     this.unitType,
     this.enforceLotTracking,
+    this.usageType,
     this.packageType,
     this.unitsPerPackage,
     this.subcategory,
@@ -63,6 +92,8 @@ class ProductModel {
     this.supplier,
     this.lotNumber,
     this.expirationDate,
+    this.selectedCategoryIds,
+    this.barcode,
   });
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
@@ -82,14 +113,17 @@ class ProductModel {
       productPurpose: json['product_purpose'],
       unitType: json['unit_type'],
       enforceLotTracking: json['enforce_lot_tracking'],
+      usageType: json['usage_type'] ?? json['product_purpose'],
       packageType: json['package_type'],
       unitsPerPackage: json['units_per_package'] as int?,
       subcategory: json['subcategory'],
       boxQuantity: json['box_quantity'] as int?,
       itemQuantityPerBox: json['item_quantity_per_box'] as int?,
       billableUnit: json['billable_unit'],
-      billableQuantityPerItem: (json['billable_quantity_per_item'] as num?)?.toDouble(),
-      totalBillableQuantity: (json['total_billable_quantity'] as num?)?.toDouble(),
+      billableQuantityPerItem: (json['billable_quantity_per_item'] as num?)
+          ?.toDouble(),
+      totalBillableQuantity: (json['total_billable_quantity'] as num?)
+          ?.toDouble(),
       clinicCost: (json['clinic_cost'] as num?)?.toDouble(),
       retailPricePerUnit: (json['retail_price_per_unit'] as num?)?.toDouble(),
       supplier: json['supplier'],
@@ -97,6 +131,10 @@ class ProductModel {
       expirationDate: json['expiration_date'] != null
           ? DateTime.parse(json['expiration_date'])
           : null,
+      selectedCategoryIds: json['selected_category_ids'] != null
+          ? List<int>.from(json['selected_category_ids'])
+          : null,
+      //  barcode: json['barcode'],
     );
   }
 
@@ -106,20 +144,21 @@ class ProductModel {
       'image': image,
       'name': name,
       'description': description,
-      'unit': unit,
-      'sku': sku,
+      // 'unit': unit,
+      // 'sku': sku,
       'category': category,
-      'quantity': quantity,
+      // 'quantity': quantity,
       'status': status,
       'brand': brand,
-      'manufacturer': manufacturer,
+      // 'manufacturer': manufacturer,
       'global_sku': globalSku,
-      'product_purpose': productPurpose,
+      // 'product_purpose': productPurpose,
       'unit_type': unitType,
       'enforce_lot_tracking': enforceLotTracking,
+      'usage_type': usageType ?? productPurpose,
       'package_type': packageType,
-      'units_per_package': unitsPerPackage,
-      'subcategory': subcategory,
+      // 'units_per_package': unitsPerPackage,
+      // 'subcategory': subcategory,
       'box_quantity': boxQuantity,
       'item_quantity_per_box': itemQuantityPerBox,
       'billable_unit': billableUnit,
@@ -130,6 +169,8 @@ class ProductModel {
       'supplier': supplier,
       'lot_number': lotNumber,
       'expiration_date': expirationDate?.toIso8601String(),
+      'selected_category_ids': selectedCategoryIds,
+      'barcode': barcode,
     };
   }
 }

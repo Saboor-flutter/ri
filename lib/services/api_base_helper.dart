@@ -67,12 +67,24 @@ class ApiBaseHelper {
     });
   }
 
-  Future<dynamic> post(Endpoint endpoint, {Object? body}) {
+  Future<dynamic> post(
+    Endpoint endpoint, {
+    Object? body,
+    Map<String, String>? pathParams,
+    Map<String, String>? queryParams,
+  }) {
     return _safeRequest(() async {
+      final urlPath = pathParams != null
+          ? endpoint.withParams(pathParams)
+          : endpoint.path;
+
+      final uri = Uri.parse(
+        '${baseUrl.url}$urlPath',
+      ).replace(queryParameters: queryParams);
       // log('URL: ${baseUrl.url}${endpoint.path}');
       // log('REQUEST: $body');
       final response = await _client.post(
-        Uri.parse('${baseUrl.url}${endpoint.path}'),
+        uri,
         headers: await _headers(),
         body: jsonEncode(body),
       );
@@ -107,12 +119,15 @@ class ApiBaseHelper {
     Endpoint endpoint, {
     Object? body,
     Map<String, String>? pathParams,
+    Map<String, String>? queryParams,
   }) {
     final urlPath = pathParams != null
         ? endpoint.withParams(pathParams)
         : endpoint.path;
 
-    final uri = Uri.parse('${baseUrl.url}$urlPath');
+    final uri = Uri.parse(
+      '${baseUrl.url}$urlPath',
+    ).replace(queryParameters: queryParams);
     return _safeRequest(() async {
       final response = await _client.patch(
         uri,
@@ -187,7 +202,7 @@ class ApiBaseHelper {
     final json = await http.post(uri, body: jsonEncode(request));
     log('RESPONSE: ${json.body}');
     final response = RefreshTokenResponse.fromJson(_processResponse(json));
-    if (!response.status) {
+    if (!response.isSuccess) {
       throw const UnauthorizedException('Unauthorized');
     }
     final secureStorage = locator<SecureStorageService>();

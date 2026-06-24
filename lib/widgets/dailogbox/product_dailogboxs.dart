@@ -7,19 +7,21 @@ import 'package:skinsync_admin/utils/validators.dart';
 import 'package:skinsync_admin/view_models/master_data_view_model.dart';
 import 'package:skinsync_admin/view_models/product_view_model.dart';
 import 'package:skinsync_admin/widgets/custom_primary_button.dart';
-
+import '../custom_outlined_button.dart';
+import '../../models/responses/category_list_response.dart';
+import '../../view_models/category_view_model.dart';
 import '../build_textfield.dart';
 import 'standard_dialog.dart';
 
-class ProductDialogBox extends StatefulWidget {
+class ProductDialogBox extends ConsumerStatefulWidget {
   const ProductDialogBox({super.key, this.product});
   final ProductModel? product;
 
   @override
-  State<ProductDialogBox> createState() => _ProductDialogBoxState();
+  ConsumerState<ProductDialogBox> createState() => _ProductDialogBoxState();
 }
 
-class _ProductDialogBoxState extends State<ProductDialogBox> {
+class _ProductDialogBoxState extends ConsumerState<ProductDialogBox> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   late final TextEditingController _nameController;
@@ -33,11 +35,6 @@ class _ProductDialogBoxState extends State<ProductDialogBox> {
   late final TextEditingController _itemQuantityPerBoxController;
   late final TextEditingController _billableQuantityPerItemController;
   late final TextEditingController _totalBillableQuantityController;
-  late final TextEditingController _clinicCostController;
-  late final TextEditingController _retailPricePerUnitController;
-  late final TextEditingController _supplierController;
-  late final TextEditingController _lotNumberController;
-  late final TextEditingController _expirationDateController;
 
   String? _selectedBrand;
   String? _selectedManufacturer;
@@ -49,7 +46,15 @@ class _ProductDialogBoxState extends State<ProductDialogBox> {
   String? _selectedBillableUnit;
   bool _enforceLotTracking = true;
   bool _activeStatus = true;
-  DateTime? _expirationDate;
+  List<int> _selectedCategoryIds = [];
+
+  void _updateTotalBillableQuantity() {
+    final int boxQty = int.tryParse(_boxQuantityController.text) ?? 0;
+    final int itemQty = int.tryParse(_itemQuantityPerBoxController.text) ?? 0;
+    final double billableQty = double.tryParse(_billableQuantityPerItemController.text) ?? 0.0;
+    final double total = boxQty * itemQty * billableQty;
+    _totalBillableQuantityController.text = total.toStringAsFixed(1);
+  }
 
   @override
   void initState() {
@@ -66,19 +71,6 @@ class _ProductDialogBoxState extends State<ProductDialogBox> {
     _itemQuantityPerBoxController = TextEditingController(text: widget.product?.itemQuantityPerBox?.toString() ?? '0');
     _billableQuantityPerItemController = TextEditingController(text: widget.product?.billableQuantityPerItem?.toString() ?? '0');
     _totalBillableQuantityController = TextEditingController(text: widget.product?.totalBillableQuantity?.toString() ?? '0');
-    _clinicCostController = TextEditingController(text: widget.product?.clinicCost?.toString() ?? '0');
-    _retailPricePerUnitController = TextEditingController(text: widget.product?.retailPricePerUnit?.toString() ?? '0');
-    _supplierController = TextEditingController(text: widget.product?.supplier);
-    _lotNumberController = TextEditingController(text: widget.product?.lotNumber);
-    
-    if (widget.product?.expirationDate != null) {
-      _expirationDate = widget.product!.expirationDate;
-      _expirationDateController = TextEditingController(
-        text: '${_expirationDate!.year}-${_expirationDate!.month}-${_expirationDate!.day}',
-      );
-    } else {
-      _expirationDateController = TextEditingController();
-    }
 
     _selectedBrand = widget.product?.brand;
     _selectedManufacturer = widget.product?.manufacturer;
@@ -90,6 +82,7 @@ class _ProductDialogBoxState extends State<ProductDialogBox> {
     _selectedBillableUnit = widget.product?.billableUnit;
     _enforceLotTracking = widget.product?.enforceLotTracking ?? true;
     _activeStatus = widget.product?.status?.toLowerCase() != 'inactive';
+    _selectedCategoryIds = widget.product?.selectedCategoryIds ?? [];
   }
 
   @override
@@ -103,11 +96,6 @@ class _ProductDialogBoxState extends State<ProductDialogBox> {
     _itemQuantityPerBoxController.dispose();
     _billableQuantityPerItemController.dispose();
     _totalBillableQuantityController.dispose();
-    _clinicCostController.dispose();
-    _retailPricePerUnitController.dispose();
-    _supplierController.dispose();
-    _lotNumberController.dispose();
-    _expirationDateController.dispose();
     super.dispose();
   }
 
@@ -171,50 +159,43 @@ class _ProductDialogBoxState extends State<ProductDialogBox> {
               Row(
                 children: [
                   Expanded(
-                    child: Consumer(
-                      builder: (context, ref, _) {
-                        final categories = ref.watch(masterDataViewModelProvider).categories;
-                        return _buildSelectOrCreateDropdown(
-                          label: 'Category',
-                          hint: 'Select Category',
-                          value: _selectedCategory,
-                          items: categories,
-                          onChanged: (val) => setState(() => _selectedCategory = val),
-                          onCreate: () => _showCreateMasterItemDialog(
-                            context,
-                            ref,
-                            'Category',
-                            (name) {
-                              ref.read(masterDataViewModelProvider.notifier).addCategory(name);
-                              setState(() => _selectedCategory = name);
-                            },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Category', style: context.fonts.black14w600),
+                            IconButton(
+                              onPressed: () => _showCategorySelectionDialog(context),
+                              icon: const Icon(Icons.add_circle_outline_rounded, color: CustomColors.purple, size: 20),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 8.h),
+                        GestureDetector(
+                          onTap: () => _showCategorySelectionDialog(context),
+                          child: AbsorbPointer(
+                            child: TextFormField(
+                              controller: TextEditingController(text: _selectedCategory),
+                              style: context.fonts.black14w400,
+                              decoration: AppDecorations.input(
+                                context,
+                                hint: 'Select Category Hierarchy',
+                              ).copyWith(
+                                suffixIcon: Icon(
+                                  Icons.keyboard_arrow_right_rounded,
+                                  color: CustomColors.lightGrey,
+                                  size: context.sp(20),
+                                ),
+                              ),
+                              validator: (val) => val == null || val.isEmpty ? 'Required' : null,
+                            ),
                           ),
-                        );
-                      },
-                    ),
-                  ),
-                  SizedBox(width: 16.w),
-                  Expanded(
-                    child: Consumer(
-                      builder: (context, ref, _) {
-                        final subcategories = ref.watch(masterDataViewModelProvider).subcategories;
-                        return _buildSelectOrCreateDropdown(
-                          label: 'Subcategory',
-                          hint: 'Select Subcategory',
-                          value: _selectedSubcategory,
-                          items: subcategories,
-                          onChanged: (val) => setState(() => _selectedSubcategory = val),
-                          onCreate: () => _showCreateMasterItemDialog(
-                            context,
-                            ref,
-                            'Subcategory',
-                            (name) {
-                              ref.read(masterDataViewModelProvider.notifier).addSubcategory(name);
-                              setState(() => _selectedSubcategory = name);
-                            },
-                          ),
-                        );
-                      },
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -240,218 +221,9 @@ class _ProductDialogBoxState extends State<ProductDialogBox> {
                   ),
                 ],
               ),
-              
-              SizedBox(height: 32.h),
-
-              // SECTION 2: PACKAGING
-              Text('SECTION 2: PACKAGING', style: context.fonts.purple12w700),
               SizedBox(height: 16.h),
               Row(
                 children: [
-                  Expanded(
-                    child: Consumer(
-                      builder: (context, ref, _) {
-                        final units = ref.watch(masterDataViewModelProvider).units;
-                        return _buildSelectOrCreateDropdown(
-                          label: 'Unit Type',
-                          hint: 'Select Unit Type',
-                          value: _selectedUnit,
-                          items: units,
-                          onChanged: (val) => setState(() => _selectedUnit = val),
-                          onCreate: () => _showCreateMasterItemDialog(
-                            context,
-                            ref,
-                            'Unit Type',
-                            (name) {
-                              ref.read(masterDataViewModelProvider.notifier).addUnit(name);
-                              setState(() => _selectedUnit = name);
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  SizedBox(width: 16.w),
-                  Expanded(
-                    child: BuildTextField(
-                      label: 'Box Quantity',
-                      controller: _boxQuantityController,
-                      hintText: 'e.g. 10',
-                      keyboardType: TextInputType.number,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 16.h),
-              Row(
-                children: [
-                  Expanded(
-                    child: BuildTextField(
-                      label: 'Item Quantity Per Box',
-                      controller: _itemQuantityPerBoxController,
-                      hintText: 'e.g. 1',
-                      keyboardType: TextInputType.number,
-                    ),
-                  ),
-                  SizedBox(width: 16.w),
-                  Expanded(
-                    child: Consumer(
-                      builder: (context, ref, _) {
-                        final packageTypes = ref.watch(masterDataViewModelProvider).packageTypes;
-                        return _buildSelectOrCreateDropdown(
-                          label: 'Package Type',
-                          hint: 'Select Package Type',
-                          value: _selectedPackageType,
-                          items: packageTypes,
-                          onChanged: (val) => setState(() => _selectedPackageType = val),
-                          onCreate: () => _showCreateMasterItemDialog(
-                            context,
-                            ref,
-                            'Package Type',
-                            (name) {
-                              ref.read(masterDataViewModelProvider.notifier).addPackageType(name);
-                              setState(() => _selectedPackageType = name);
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-
-              SizedBox(height: 32.h),
-
-              // SECTION 3: BILLING / CONSUMPTION
-              Text('SECTION 3: BILLING / CONSUMPTION', style: context.fonts.purple12w700),
-              SizedBox(height: 16.h),
-              Row(
-                children: [
-                  Expanded(
-                    child: Consumer(
-                      builder: (context, ref, _) {
-                        final units = ref.watch(masterDataViewModelProvider).units;
-                        return _buildSelectOrCreateDropdown(
-                          label: 'Billable Unit',
-                          hint: 'Select Billable Unit',
-                          value: _selectedBillableUnit,
-                          items: units,
-                          onChanged: (val) => setState(() => _selectedBillableUnit = val),
-                          onCreate: () => _showCreateMasterItemDialog(
-                            context,
-                            ref,
-                            'Billable Unit',
-                            (name) {
-                              ref.read(masterDataViewModelProvider.notifier).addUnit(name);
-                              setState(() => _selectedBillableUnit = name);
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  SizedBox(width: 16.w),
-                  Expanded(
-                    child: BuildTextField(
-                      label: 'Billable Quantity Per Item',
-                      controller: _billableQuantityPerItemController,
-                      hintText: 'e.g. 1.0',
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 16.h),
-              BuildTextField(
-                label: 'Total Billable Quantity',
-                controller: _totalBillableQuantityController,
-                hintText: 'e.g. 100.0',
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              ),
-
-              SizedBox(height: 32.h),
-
-              // SECTION 4: PRICING
-              Text('SECTION 4: PRICING', style: context.fonts.purple12w700),
-              SizedBox(height: 16.h),
-              Row(
-                children: [
-                  Expanded(
-                    child: BuildTextField(
-                      label: 'Clinic Cost (\$)',
-                      controller: _clinicCostController,
-                      hintText: '0.00',
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: Validators.empty,
-                    ),
-                  ),
-                  SizedBox(width: 16.w),
-                  Expanded(
-                    child: BuildTextField(
-                      label: 'Retail Price Per Unit (\$)',
-                      controller: _retailPricePerUnitController,
-                      hintText: '0.00',
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: Validators.empty,
-                    ),
-                  ),
-                ],
-              ),
-
-              SizedBox(height: 32.h),
-
-              // SECTION 5: SUPPLIER & INVENTORY
-              Text('SECTION 5: SUPPLIER & INVENTORY', style: context.fonts.purple12w700),
-              SizedBox(height: 16.h),
-              Row(
-                children: [
-                  Expanded(
-                    child: BuildTextField(
-                      label: 'Supplier',
-                      controller: _supplierController,
-                      hintText: 'Enter supplier name...',
-                    ),
-                  ),
-                  SizedBox(width: 16.w),
-                  Expanded(
-                    child: BuildTextField(
-                      label: 'Lot Number',
-                      controller: _lotNumberController,
-                      hintText: 'e.g. LOT123456',
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 16.h),
-              Row(
-                children: [
-                  Expanded(
-                    child: InkWell(
-                      onTap: () async {
-                        final date = await showDatePicker(
-                          context: context,
-                          initialDate: _expirationDate ?? DateTime.now(),
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime(2100),
-                        );
-                        if (date != null) {
-                          setState(() {
-                            _expirationDate = date;
-                            _expirationDateController.text = '${date.year}-${date.month}-${date.day}';
-                          });
-                        }
-                      },
-                      child: AbsorbPointer(
-                        child: BuildTextField(
-                          label: 'Expiration Date',
-                          controller: _expirationDateController,
-                          hintText: 'YYYY-MM-DD',
-                          suffixIcon: const Icon(Icons.calendar_today_rounded, size: 18),
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 16.w),
                   Expanded(
                     child: Consumer(
                       builder: (context, ref, _) {
@@ -482,8 +254,278 @@ class _ProductDialogBoxState extends State<ProductDialogBox> {
                       },
                     ),
                   ),
+                  // Expanded(
+                  //   child: SelectOrCreateDropdown<UsageType>(
+                  //     label: 'Usage Type',
+                  //     hint: 'Select Usage Type',
+                  //     value: _selectedPurpose,
+                  //     items: UsageType.values,
+                  //     itemLabel: (usageType) => usageType.name,
+                  //     onChanged: (val) =>
+                  //         setState(() => _selectedPurpose = val),
+                  //     onOpen: () => ref
+                  //         .read(productViewModelProvider.notifier)
+                  //         .fetchBrand(),
+                  //     onCreate: () {},
+                  //     // onCreate: () => _showCreateMasterItemDialog(
+                  //     //   context,
+                  //     //   ref,
+                  //     //   'Usage Type',
+                  //     //       (name) =>
+                  //     //       setState(() => _selectedPurpose = name),
+                  //     // ),
+                  //   ),
+                  // ),
                 ],
               ),
+              
+              SizedBox(height: 32.h),
+
+              // SECTION 2: PACKAGING
+              Text('SECTION 2: PACKAGING', style: context.fonts.purple12w700),
+              SizedBox(height: 16.h),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Consumer(
+                          builder: (context, ref, _) {
+                            final packageTypes = ref.watch(masterDataViewModelProvider).packageTypes;
+                            return _buildSelectOrCreateDropdown(
+                              label: 'Unit Type',
+                              hint: 'Select Unit Type',
+                              value: _selectedUnit,
+                              items: packageTypes,
+                              onChanged: (val) {
+                                setState(() {
+                                  _selectedUnit = val;
+                                  _updateTotalBillableQuantity();
+                                });
+                              },
+                              onCreate: () => _showCreateMasterItemDialog(
+                                context,
+                                ref,
+                                'Unit Type',
+                                (name) {
+                                  ref.read(masterDataViewModelProvider.notifier).addPackageType(name);
+                                  setState(() {
+                                    _selectedUnit = name;
+                                    _updateTotalBillableQuantity();
+                                  });
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                        SizedBox(height: 6.h),
+                        Text('The bulk unit purchased from suppliers, e.g. Carton, Case.', style: context.fonts.grey12w400),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: 16.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        BuildTextField(
+                          label: 'Box Quantity',
+                          controller: _boxQuantityController,
+                          hintText: 'e.g. 10',
+                          keyboardType: TextInputType.number,
+                          onChanged: (_) {
+                            setState(() {
+                              _updateTotalBillableQuantity();
+                            });
+                          },
+                        ),
+                        SizedBox(height: 6.h),
+                        Text('Number of inner boxes inside one Unit Type bulk unit.', style: context.fonts.grey12w400),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 16.h),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        BuildTextField(
+                          label: 'Item Quantity Per Box',
+                          controller: _itemQuantityPerBoxController,
+                          hintText: 'e.g. 1',
+                          keyboardType: TextInputType.number,
+                          onChanged: (_) {
+                            setState(() {
+                              _updateTotalBillableQuantity();
+                            });
+                          },
+                        ),
+                        SizedBox(height: 6.h),
+                        Text('Count of physical consumable items (like syringes) per inner box.', style: context.fonts.grey12w400),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: 16.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Consumer(
+                          builder: (context, ref, _) {
+                            final units = ref.watch(masterDataViewModelProvider).units;
+                            return _buildSelectOrCreateDropdown(
+                              label: 'Package Type',
+                              hint: 'Select Package Type',
+                              value: _selectedPackageType,
+                              items: units,
+                              onChanged: (val) {
+                                setState(() {
+                                  _selectedPackageType = val;
+                                  _updateTotalBillableQuantity();
+                                });
+                              },
+                              onCreate: () => _showCreateMasterItemDialog(
+                                context,
+                                ref,
+                                'Package Type',
+                                (name) {
+                                  ref.read(masterDataViewModelProvider.notifier).addUnit(name);
+                                  setState(() {
+                                    _selectedPackageType = name;
+                                    _updateTotalBillableQuantity();
+                                  });
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                        SizedBox(height: 6.h),
+                        Text('The base physical consumable item type, e.g. Syringe, Vial.', style: context.fonts.grey12w400),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              // DYNAMIC PACKAGING CALCULATION FOOTER
+              Builder(
+                builder: (context) {
+                  final int boxQty = int.tryParse(_boxQuantityController.text) ?? 0;
+                  final int itemQty = int.tryParse(_itemQuantityPerBoxController.text) ?? 0;
+                  final int totalItems = boxQty * itemQty;
+                  final String unitName = _selectedUnit ?? 'Carton';
+                  final String packName = _selectedPackageType ?? 'Syringe';
+                  
+                  return Container(
+                    margin: EdgeInsets.only(top: 16.h),
+                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: CustomColors.purple.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(8.r),
+                      border: Border.all(color: CustomColors.purple.withValues(alpha: 0.1)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calculate_outlined, color: CustomColors.purple, size: 20),
+                        SizedBox(width: 12.w),
+                        Expanded(
+                          child: Text(
+                            "Total ${packName}s in 1 $unitName = $boxQty boxes × $itemQty ${packName}s = $totalItems ${packName}s.",
+                            style: context.fonts.purple14w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+              ),
+
+              SizedBox(height: 32.h),
+
+              // SECTION 3: BILLING / CONSUMPTION
+              Text('SECTION 3: BILLING / CONSUMPTION', style: context.fonts.purple12w700),
+              SizedBox(height: 16.h),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Consumer(
+                          builder: (context, ref, _) {
+                            final units = ref.watch(masterDataViewModelProvider).units;
+                            return _buildSelectOrCreateDropdown(
+                              label: 'Billable Unit',
+                              hint: 'Select Billable Unit',
+                              value: _selectedBillableUnit,
+                              items: units,
+                              onChanged: (val) => setState(() => _selectedBillableUnit = val),
+                              onCreate: () => _showCreateMasterItemDialog(
+                                context,
+                                ref,
+                                'Billable Unit',
+                                (name) {
+                                  ref.read(masterDataViewModelProvider.notifier).addUnit(name);
+                                  setState(() => _selectedBillableUnit = name);
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                        SizedBox(height: 6.h),
+                        Text('Unit of measurement for treatment and billing, e.g. ml, units.', style: context.fonts.grey12w400),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: 16.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        BuildTextField(
+                          label: 'Billable Quantity Per Item',
+                          controller: _billableQuantityPerItemController,
+                          hintText: 'e.g. 1.0',
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          onChanged: (_) {
+                            setState(() {
+                              _updateTotalBillableQuantity();
+                            });
+                          },
+                        ),
+                        SizedBox(height: 6.h),
+                        Text('Volume or potency contained in a single syringe/vial, e.g. 4.0 ml.', style: context.fonts.grey12w400),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 16.h),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  BuildTextField(
+                    label: 'Total Billable Quantity',
+                    controller: _totalBillableQuantityController,
+                    hintText: 'Calculated automatically...',
+                    readOnly: true,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                  SizedBox(height: 6.h),
+                  Text('Calculated total volume/potency of the entire bulk unit (Unit Type) in billable units.', style: context.fonts.grey12w400),
+                ],
+              ),
+
+              SizedBox(height: 32.h),
 
               SizedBox(height: 32.h),
               
@@ -547,11 +589,8 @@ class _ProductDialogBoxState extends State<ProductDialogBox> {
                   billableUnit: _selectedBillableUnit,
                   billableQuantityPerItem: double.tryParse(_billableQuantityPerItemController.text),
                   totalBillableQuantity: double.tryParse(_totalBillableQuantityController.text),
-                  clinicCost: double.tryParse(_clinicCostController.text),
-                  retailPricePerUnit: double.tryParse(_retailPricePerUnitController.text),
-                  supplier: _supplierController.text,
-                  lotNumber: _lotNumberController.text,
-                  expirationDate: _expirationDate,
+                  selectedCategoryIds: _selectedCategoryIds,
+                  barcode: _barcodeController.text,
                 );
                 
                 final notifier = ref.read(productViewModelProvider.notifier);
@@ -707,6 +746,240 @@ class _ProductDialogBoxState extends State<ProductDialogBox> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showCategorySelectionDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => CategorySelectionDialog(
+        initialCategoryIds: _selectedCategoryIds,
+        onConfirmed: (result) {
+          setState(() {
+            _selectedCategory = result['path'] as String;
+            _selectedCategoryIds = result['ids'] as List<int>;
+          });
+        },
+      ),
+    );
+  }
+}
+
+class CategorySelectionDialog extends ConsumerStatefulWidget {
+  final List<int> initialCategoryIds;
+  final ValueChanged<Map<String, dynamic>> onConfirmed;
+
+  const CategorySelectionDialog({
+    super.key,
+    required this.initialCategoryIds,
+    required this.onConfirmed,
+  });
+
+  @override
+  ConsumerState<CategorySelectionDialog> createState() => _CategorySelectionDialogState();
+}
+
+class _CategorySelectionDialogState extends ConsumerState<CategorySelectionDialog> {
+  final List<int> _selectedIds = [];
+  final List<String> _selectedNames = [];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(categoryViewModelProvider.notifier).fetchCategories();
+    });
+
+    _selectedIds.addAll(widget.initialCategoryIds);
+    _rebuildNamesPath();
+  }
+
+  void _rebuildNamesPath() {
+    _selectedNames.clear();
+    final categories = ref.read(categoryViewModelProvider).categories;
+    
+    CategoryModel? findInList(List<CategoryModel> list, int id) {
+      for (final cat in list) {
+        if (cat.id == id) return cat;
+        final child = findInList(cat.subCategories, id);
+        if (child != null) return child;
+      }
+      return null;
+    }
+
+    for (final id in _selectedIds) {
+      final node = findInList(categories, id);
+      if (node != null) {
+        _selectedNames.add(node.name);
+      }
+    }
+  }
+
+  CategoryModel? _findCategoryInTree(List<CategoryModel> items, int id) {
+    for (final item in items) {
+      if (item.id == id) return item;
+      if (item.subCategories.isNotEmpty) {
+        final found = _findCategoryInTree(item.subCategories, id);
+        if (found != null) return found;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final categoryState = ref.watch(categoryViewModelProvider);
+    final categories = categoryState.categories;
+
+    final List<List<CategoryModel>> columns = [categories];
+    for (int i = 0; i < _selectedIds.length; i++) {
+      final selectedId = _selectedIds[i];
+      final node = _findCategoryInTree(categories, selectedId);
+      if (node != null && node.subCategories.isNotEmpty) {
+        columns.add(node.subCategories);
+      } else {
+        break;
+      }
+    }
+
+    final selectedPathText = _selectedNames.isNotEmpty
+        ? _selectedNames.join(' → ')
+        : 'None';
+
+    return StandardDialog(
+      title: 'Select Category',
+      width: context.w(800),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Selected Path:',
+            style: context.fonts.black14w600,
+          ),
+          SizedBox(height: 8.h),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: CustomColors.whiteGrey,
+              borderRadius: BorderRadius.circular(8.r),
+              border: Border.all(color: CustomColors.border),
+            ),
+            child: Text(
+              selectedPathText,
+              style: context.fonts.purple14w600,
+            ),
+          ),
+          SizedBox(height: 24.h),
+          SizedBox(
+            height: context.h(300),
+            child: columns.isEmpty || categories.isEmpty
+                ? const Center(child: CircularProgressIndicator())
+                : Scrollbar(
+                    thumbVisibility: true,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: columns.length,
+                      separatorBuilder: (context, index) => Container(
+                        width: 1,
+                        color: CustomColors.border,
+                        margin: EdgeInsets.symmetric(horizontal: 12.w),
+                      ),
+                      itemBuilder: (context, columnIndex) {
+                        final items = columns[columnIndex];
+                        final activeId = _selectedIds.length > columnIndex
+                            ? _selectedIds[columnIndex]
+                            : null;
+
+                        return SizedBox(
+                          width: context.w(220),
+                          child: ListView.builder(
+                            itemCount: items.length,
+                            itemBuilder: (context, itemIndex) {
+                              final item = items[itemIndex];
+                              final isSelected = activeId == item.id;
+
+                              return Container(
+                                margin: EdgeInsets.only(bottom: 8.h),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? CustomColors.purple.withValues(alpha: 0.1)
+                                      : Colors.white,
+                                  borderRadius: context.appBorderRadius(all: 10),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? CustomColors.purple
+                                        : CustomColors.border,
+                                    width: isSelected ? 1.5 : 1,
+                                  ),
+                                ),
+                                child: ListTile(
+                                  title: Text(
+                                    item.name,
+                                    style: isSelected
+                                        ? context.fonts.purple14w600
+                                        : context.fonts.black14w400,
+                                  ),
+                                  trailing: item.subCategories.isNotEmpty
+                                      ? Icon(
+                                          Icons.chevron_right_rounded,
+                                          color: isSelected
+                                              ? CustomColors.purple
+                                              : CustomColors.lightGrey,
+                                        )
+                                      : null,
+                                  onTap: () {
+                                    setState(() {
+                                      if (columnIndex < _selectedIds.length) {
+                                        _selectedIds.removeRange(
+                                            columnIndex, _selectedIds.length);
+                                        _selectedNames.removeRange(
+                                            columnIndex, _selectedNames.length);
+                                      }
+                                      _selectedIds.add(item.id);
+                                      _selectedNames.add(item.name);
+                                    });
+                                  },
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+          ),
+        ],
+      ),
+      actions: [
+        CustomOutlinedButton(
+          onTap: () {
+            widget.onConfirmed({
+              'path': '',
+              'ids': <int>[],
+            });
+            Navigator.pop(context);
+          },
+          label: 'Clear Category',
+        ),
+        const Spacer(),
+        CustomOutlinedButton(
+          onTap: () => Navigator.pop(context),
+          label: 'Cancel',
+        ),
+        SizedBox(width: 12.w),
+        CustomPrimaryButton(
+          onTap: () {
+            widget.onConfirmed({
+              'path': _selectedNames.join(' > '),
+              'ids': List<int>.from(_selectedIds),
+            });
+            Navigator.pop(context);
+          },
+          label: 'Select Category',
+        ),
+      ],
     );
   }
 }
