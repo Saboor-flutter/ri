@@ -1,4 +1,3 @@
-
 enum SharedPreferencesKeys {
   themeModeKey('theme-mode'),
   accessTokenKey('access-token'),
@@ -19,7 +18,7 @@ enum AuthScreen { login, forgetPassword, verifyOtp, createNewPassword }
 enum Endpoint {
   // auth
   login('admin/login'),
-  refreshToken('clinic/auth/refresh'),
+  refreshToken('admin/auth/refresh'),
   forgotPassword('admin/forgot-password'),
   // resendOtp('admin/reset-password'),
   verifyResetOtp('admin/verify-reset-otp'),
@@ -27,6 +26,8 @@ enum Endpoint {
   //products
   products('admin/products'),
   updateProduct('admin/products/{id}'),
+  deleteProduct('admin/products/{id}'),
+
   //clinics
   getClinics('clinics'),
   registerClinic('admin/clinic/register'),
@@ -39,16 +40,20 @@ enum Endpoint {
   createCategory('admin/categories'),
   areas('admin/areas'),
   subAreas('admin/areas/sub'),
-    protocol('admin/treatments/step'),
-
+  productsByTreatmentId('admin/products/by-treatment'),
   basicInfo('admin/treatments/create'),
   getBrands('admin/brands'),
   unitTypesList('admin/unit-types'),
   packageTypeList('admin/package-types'),
   usageType('admin/usage-types'),
-
-  manufacturersList('admin/manufacturers');
-
+  treatmentArea('admin/treatments/step'),
+  adminTreatments('admin/treatments/list'),
+  treatmentDetail('admin/treatments/{id}'),
+  updateTreatment('admin/treatments/update'),
+  manufacturersList('admin/manufacturers'),
+  suppliers('admin/suppliers'),
+  productsStatus('admin/products/status'),
+  treatmentsStatus('admin/treatments/status');
 
   final String path;
   const Endpoint(this.path);
@@ -63,14 +68,56 @@ enum Endpoint {
 }
 
 enum BaseUrls {
-  // api('http://3.128.27.193/api/');
   api('https://api.skinsyncai.com/api/'),
   apiQa('https://api-qa.skinsyncai.com/api/');
-  // api('https://s21hn0m8-8084.asse.devtunnels.ms/api/');
 
   final String url;
 
   const BaseUrls(this.url);
+}
+
+enum CreateTreatmentSteps {
+  allowedProviderRoles('allowed_provider_roles'),
+  patientConsent('patient_consent'),
+  phaseNotifications('phase_notifications'),
+  postTreatmentInstructions('post_treatment_instructions'),
+  preTreatmentInstructions('pre_treatment_instructions'),
+  inventoryProducts('inventory_products'),
+  protocols('protocols'),
+  sessionsSetup('sessions_setup'),
+  pricing('pricing'),
+  categories('categories'),
+  treatmentAreas('treatment_areas'),
+  scheduling('scheduling'),
+  postTreatmentPhotos('post_treatment_photos'),
+  downtimeLevel('downtime_level'),
+  followUpSetup('follow_up_setup'),
+  businessLogic('business_logic');
+
+  final String name;
+
+  const CreateTreatmentSteps(this.name);
+}
+
+enum TreatmentStatus {
+  all('All'),
+  active('Active'),
+  inactive('InActive'),
+  darft('Draft');
+
+  final String name;
+
+  const TreatmentStatus(this.name);
+}
+
+enum ProductStatus {
+  all('All'),
+  active('Active'),
+  inactive('InActive');
+
+  final String name;
+
+  const ProductStatus(this.name);
 }
 
 // enum UsageType {
@@ -84,4 +131,3 @@ enum BaseUrls {
 //   log('API: ${type.name}');
 //   log('DISPLAY: ${type.name.capitalize}');
 // }
-

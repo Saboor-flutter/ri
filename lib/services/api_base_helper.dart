@@ -81,12 +81,13 @@ class ApiBaseHelper {
       final uri = Uri.parse(
         '${baseUrl.url}$urlPath',
       ).replace(queryParameters: queryParams);
-      // log('URL: ${baseUrl.url}${endpoint.path}');
-      // log('REQUEST: $body');
+      log('URL: ${baseUrl.url}${endpoint.path}');
+      final encodedBody = jsonEncode(body);
+      log('REQUEST: $encodedBody');
       final response = await _client.post(
         uri,
         headers: await _headers(),
-        body: jsonEncode(body),
+        body: encodedBody,
       );
       return _processResponse(response);
     });
@@ -129,6 +130,8 @@ class ApiBaseHelper {
       '${baseUrl.url}$urlPath',
     ).replace(queryParameters: queryParams);
     return _safeRequest(() async {
+      log('PATCH URL: $uri');
+      log('PATCH BODY: ${jsonEncode(body)}');
       final response = await _client.patch(
         uri,
         headers: await _headers(),
